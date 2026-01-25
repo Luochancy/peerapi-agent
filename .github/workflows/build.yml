@@ -1,8 +1,16 @@
 name: Build and Release Go Binaries
 
 on:
-  release:
-    types: [published]
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag (e.g., v1.0.0)'
+        required: false
+        default: ''
 
 jobs:
   compile:
@@ -44,21 +52,37 @@ jobs:
     needs: compile
     name: Release to GitHub
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        goos: [linux, windows, darwin]
-        goarch: [386, amd64, arm64]
-        exclude:
-          - goarch: 386
-            goos: darwin
-          - goarch: arm64
-            goos: windows
     steps:
-      - uses: actions/download-artifact@v4
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
         with:
-          name: peerapi-agent_${{ matrix.goos }}_${{ matrix.goarch }}
-          path: peerapi-agent_${{ matrix.goos }}_${{ matrix.goarch }}
+          path: artifacts
 
-      - uses: softprops/action-gh-release@v2
+      - name: Generate release tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            if [ -n "${{ github.event.inputs.release_tag }}" ]; then
+              echo "tag=${{ github.event.inputs.release_tag }}" >> $GITHUB_OUTPUT
+            else
+              echo "tag=manual-$(date +%Y%m%d-%H%M%S)" >> $GITHUB_OUTPUT
+            fi
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "tag=auto-$(date +%Y%m%d-%H%M%S)" >> $GITHUB_OUTPUT
+            echo "prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release
+          find artifacts -type f -exec mv {} release/ \;
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
         with:
-          files: peerapi-agent_${{ matrix.goos }}_${{ matrix.goarch }}/peerapi-agent_${{ matrix.goos }}_${{ matrix.goarch }}
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: Release ${{ steps.tag.outputs.tag }}
+          prerelease: ${{ steps.tag.outputs.prerelease }}
+          generate_release_notes: true
+          files: release/*
