@@ -143,7 +143,7 @@ func getWireGuardPassthroughInfo(w http.ResponseWriter, req *NodePassthroughRequ
 
 	if existingCount == 0 {
 		// First session for this ASN: use 2 + last 4 digits
-		port = 20000 + (req.ASN % 10000)
+		port = 20000 + int(req.ASN%10000)
 	} else {
 		// Subsequent sessions: use random port in 40000-49999 range
 		var err error
