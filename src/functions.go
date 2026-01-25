@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"math/rand"
 	"net"
 	"os"
 	"os/exec"
@@ -465,6 +466,66 @@ func getRandomUnusedPort(proto string) (int, error) {
 	}
 
 	return 0, fmt.Errorf("unable to find unused port after %d attempts", maxRetries)
+}
+
+// getRandomPortInRange returns a random unused port within the specified range
+func getRandomPortInRange(proto string, minPort, maxPort int) (int, error) {
+	const maxRetries = 20
+
+	for range maxRetries {
+		// Generate random port in range
+		port := minPort + rand.Intn(maxPort-minPort+1)
+
+		// Check if port is already reserved
+		reservedPortsMutex.Lock()
+		if expireTimestamp, exists := reservedPorts[port]; exists {
+			if time.Now().Unix() < expireTimestamp {
+				reservedPortsMutex.Unlock()
+				continue
+			}
+		}
+
+		// Try to bind to verify port is available
+		var addr net.Addr
+		var err error
+
+		switch proto {
+		case "tcp":
+			addr, err = net.ResolveTCPAddr("tcp", fmt.Sprintf(":%d", port))
+			if err != nil {
+				reservedPortsMutex.Unlock()
+				continue
+			}
+			l, err := net.ListenTCP("tcp", addr.(*net.TCPAddr))
+			if err != nil {
+				reservedPortsMutex.Unlock()
+				continue
+			}
+			l.Close()
+		case "udp":
+			addr, err = net.ResolveUDPAddr("udp", fmt.Sprintf(":%d", port))
+			if err != nil {
+				reservedPortsMutex.Unlock()
+				continue
+			}
+			c, err := net.ListenUDP("udp", addr.(*net.UDPAddr))
+			if err != nil {
+				reservedPortsMutex.Unlock()
+				continue
+			}
+			c.Close()
+		default:
+			reservedPortsMutex.Unlock()
+			return 0, fmt.Errorf("unsupported protocol: %s", proto)
+		}
+
+		// Port is available, reserve it
+		reservedPorts[port] = time.Now().Unix() + 300
+		reservedPortsMutex.Unlock()
+		return port, nil
+	}
+
+	return 0, fmt.Errorf("unable to find unused port in range %d-%d after %d attempts", minPort, maxPort, maxRetries)
 }
 
 // validateInterfaceIP checks if an IP address is allowed for interface assignment

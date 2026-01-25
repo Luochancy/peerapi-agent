@@ -29,6 +29,7 @@ type SessionData struct {
 type BirdTemplateData struct {
 	SessionName       string
 	InterfaceAddr     string
+	SourceAddress     string
 	ASN               uint
 	IPv4ShouldImport  bool
 	IPv4ShouldExport  bool
@@ -122,7 +123,7 @@ func configureWireguardInterface(ctx context.Context, session *BgpSession) error
 		return err
 	}
 
-	if err := configureIPAddresses(ctx, session); err != nil {
+	if err := configureWireguardAddresses(ctx, session); err != nil {
 		return err
 	}
 
@@ -255,6 +256,37 @@ func configureIPAddresses(ctx context.Context, session *BgpSession) error {
 	return nil
 }
 
+func configureWireguardAddresses(ctx context.Context, session *BgpSession) error {
+	ipAddresses := []struct {
+		value string
+		label string
+	}{
+		{cfg.IP.IPv4, "IPv4"},
+		{cfg.IP.IPv6, "IPv6"},
+		{cfg.IP.IPv6LinkLocal, "IPv6 Link Local"},
+	}
+
+	for _, ipAddr := range ipAddresses {
+		if allowed, err := validateInterfaceIP(ipAddr.value); !allowed {
+			return fmt.Errorf("%s address %s validation failed: %v", ipAddr.label, ipAddr.value, err)
+		}
+	}
+
+	if err := addInterfaceAddress(ctx, session.Interface, cfg.IP.IPv4, "", 32, "IPv4"); err != nil {
+		return err
+	}
+
+	if err := addInterfaceAddress(ctx, session.Interface, cfg.IP.IPv6LinkLocal, "", 64, "IPv6 link-local"); err != nil {
+		return err
+	}
+
+	if err := addInterfaceAddress(ctx, session.Interface, cfg.IP.IPv6, "", 128, "IPv6"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func setIPv6InterfaceRoute(ctx context.Context, session *BgpSession) error {
 	dest := ensureCIDR(session.IPv6, 128)
 	if dest == "" {
@@ -302,7 +334,7 @@ func bringUpInterface(ctx context.Context, session *BgpSession) error {
 		return fmt.Errorf("failed to bring up interface %s: %v (output: \"%s\")", session.Interface, err, output)
 	}
 
-	if session.IPv6 != "" {
+	if session.Type != "wireguard" && session.IPv6 != "" {
 		if err := setIPv6InterfaceRoute(ctx, session); err != nil {
 			return fmt.Errorf("failed to set IPv6 dev route for interface: %v", err)
 		}
@@ -404,6 +436,7 @@ func generateMPBGPConfig(outFile *os.File, session *BgpSession, sessionName stri
 	if err != nil {
 		return err
 	}
+	sourceAddr := getBirdSourceAddress()
 
 	filterParamsIPv4 := fmt.Sprintf("%d,%d,%d,%d,%d", 0, ifBwCommunity, ifSecCommunity, session.Policy, probeStatusFlag(session.UUID, probeFamilyIPv4))
 	filterParamsIPv6 := fmt.Sprintf("%d,%d,%d,%d,%d", 0, ifBwCommunity, ifSecCommunity, session.Policy, probeStatusFlag(session.UUID, probeFamilyIPv6))
@@ -411,6 +444,7 @@ func generateMPBGPConfig(outFile *os.File, session *BgpSession, sessionName stri
 	templateData := BirdTemplateData{
 		SessionName:       sessionName,
 		InterfaceAddr:     interfaceAddr,
+		SourceAddress:     sourceAddr,
 		ASN:               session.ASN,
 		IPv4ShouldImport:  true,
 		IPv4ShouldExport:  true,
@@ -429,6 +463,8 @@ func generateMPBGPConfig(outFile *os.File, session *BgpSession, sessionName stri
 }
 
 func generateTraditionalBGPConfig(outFile *os.File, session *BgpSession, sessionName string, extendedNexthop bool, ifBwCommunity, ifSecCommunity int) error {
+	sourceAddr := getBirdSourceAddress()
+
 	if session.IPv6LinkLocal != "" || session.IPv6 != "" {
 		var interfaceAddr string
 		if session.IPv6LinkLocal != "" {
@@ -440,6 +476,7 @@ func generateTraditionalBGPConfig(outFile *os.File, session *BgpSession, session
 		templateData := BirdTemplateData{
 			SessionName:       sessionName + "_v6",
 			InterfaceAddr:     interfaceAddr,
+			SourceAddress:     sourceAddr,
 			ASN:               session.ASN,
 			IPv4ShouldImport:  false,
 			IPv4ShouldExport:  false,
@@ -459,6 +496,7 @@ func generateTraditionalBGPConfig(outFile *os.File, session *BgpSession, session
 		templateData := BirdTemplateData{
 			SessionName:       sessionName + "_v4",
 			InterfaceAddr:     session.IPv4,
+			SourceAddress:     sourceAddr,
 			ASN:               session.ASN,
 			IPv4ShouldImport:  true,
 			IPv4ShouldExport:  true,
@@ -489,6 +527,13 @@ func getNeighborAddress(session *BgpSession) (string, error) {
 	}
 
 	return "", fmt.Errorf("no valid interface addresses for peering session %s", session.UUID)
+}
+
+func getBirdSourceAddress() string {
+	if addr := stripCIDRSuffix(cfg.IP.IPv6LinkLocal); addr != "" {
+		return addr
+	}
+	return stripCIDRSuffix(cfg.IP.IPv6)
 }
 
 func deleteBird(session *BgpSession) error {

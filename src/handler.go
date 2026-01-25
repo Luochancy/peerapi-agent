@@ -130,10 +130,28 @@ func nodePassthroughInfo(w http.ResponseWriter, r *http.Request) {
 }
 
 func getWireGuardPassthroughInfo(w http.ResponseWriter, req *NodePassthroughRequest) {
-	port, err := getRandomUnusedPort("udp")
-	if err != nil {
-		sendJSONResponse(w, http.StatusInternalServerError, "Failed to get random unused port", nil)
-		return
+	// Check if this ASN already has an existing session
+	var port int
+	sessionMutex.RLock()
+	existingCount := 0
+	for _, session := range localSessions {
+		if session.ASN == req.ASN && session.Type == "wireguard" {
+			existingCount++
+		}
+	}
+	sessionMutex.RUnlock()
+
+	if existingCount == 0 {
+		// First session for this ASN: use 2 + last 4 digits
+		port = 20000 + (req.ASN % 10000)
+	} else {
+		// Subsequent sessions: use random port in 40000-49999 range
+		var err error
+		port, err = getRandomPortInRange("udp", 40000, 49999)
+		if err != nil {
+			sendJSONResponse(w, http.StatusInternalServerError, "Failed to get random port", nil)
+			return
+		}
 	}
 
 	// Create the passthrough data
