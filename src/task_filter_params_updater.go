@@ -217,7 +217,6 @@ func updateBirdConfig(session *BgpSession, latencyCommunity, ifBwCommunity, ifSe
 
 	// Generate base session name
 	// Replace dashes with underscores for BIRD compatibility
-	sanitizedInterface := strings.ReplaceAll(session.Interface, "-", "_")
 	sessionName := fmt.Sprintf("DN42_%d_%s", session.ASN, sanitizedInterface)
 
 	// Check if MP-BGP or extended nexthop is enabled

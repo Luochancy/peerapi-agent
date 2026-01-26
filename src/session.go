@@ -396,7 +396,6 @@ func configureBird(session *BgpSession) error {
 	defer outFile.Close()
 
 	// Replace dashes with underscores for BIRD compatibility
-	sanitizedInterface := strings.ReplaceAll(session.Interface, "-", "_")
 	sessionName := fmt.Sprintf("DN42_%d_%s", session.ASN, sanitizedInterface)
 
 	if mpBGP {
