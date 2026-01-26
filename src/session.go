@@ -28,6 +28,7 @@ type SessionData struct {
 // BirdTemplateData holds the data needed to render a BIRD configuration template
 type BirdTemplateData struct {
 	SessionName       string
+	Interface         string
 	InterfaceAddr     string
 	SourceAddress     string
 	ASN               uint
@@ -446,8 +447,10 @@ func generateMPBGPConfig(outFile *os.File, session *BgpSession, sessionName stri
 	filterParamsIPv4 := fmt.Sprintf("%d,%d,%d,%d,%d", 0, ifBwCommunity, ifSecCommunity, session.Policy, probeStatusFlag(session.UUID, probeFamilyIPv4))
 	filterParamsIPv6 := fmt.Sprintf("%d,%d,%d,%d,%d", 0, ifBwCommunity, ifSecCommunity, session.Policy, probeStatusFlag(session.UUID, probeFamilyIPv6))
 
+	sanitizedInterface := strings.ReplaceAll(session.Interface, "-", "_")
 	templateData := BirdTemplateData{
 		SessionName:       sessionName,
+		Interface:         sanitizedInterface,
 		InterfaceAddr:     interfaceAddr,
 		SourceAddress:     sourceAddr,
 		ASN:               session.ASN,
@@ -478,8 +481,10 @@ func generateTraditionalBGPConfig(outFile *os.File, session *BgpSession, session
 			interfaceAddr = session.IPv6
 		}
 
+		sanitizedInterface := strings.ReplaceAll(session.Interface, "-", "_")
 		templateData := BirdTemplateData{
 			SessionName:       sessionName + "_v6",
+			Interface:         sanitizedInterface,
 			InterfaceAddr:     interfaceAddr,
 			SourceAddress:     sourceAddr,
 			ASN:               session.ASN,
@@ -498,8 +503,10 @@ func generateTraditionalBGPConfig(outFile *os.File, session *BgpSession, session
 	}
 
 	if session.IPv4 != "" {
+		sanitizedInterface := strings.ReplaceAll(session.Interface, "-", "_")
 		templateData := BirdTemplateData{
 			SessionName:       sessionName + "_v4",
+			Interface:         sanitizedInterface,
 			InterfaceAddr:     session.IPv4,
 			SourceAddress:     sourceAddr,
 			ASN:               session.ASN,
