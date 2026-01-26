@@ -130,18 +130,10 @@ func nodePassthroughInfo(w http.ResponseWriter, r *http.Request) {
 }
 
 func getWireGuardPassthroughInfo(w http.ResponseWriter, req *NodePassthroughRequest) {
-	// Check if this ASN already has an existing session
+	// Use existing session count from API to determine port allocation
 	var port int
-	sessionMutex.RLock()
-	existingCount := 0
-	for _, session := range localSessions {
-		if session.ASN == req.ASN && session.Type == "wireguard" {
-			existingCount++
-		}
-	}
-	sessionMutex.RUnlock()
 
-	if existingCount == 0 {
+	if req.ExistingSessionCount == 0 {
 		// First session for this ASN: use 2 + last 4 digits
 		port = 20000 + int(req.ASN%10000)
 	} else {

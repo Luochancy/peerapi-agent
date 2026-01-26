@@ -116,7 +116,7 @@
     "privateKeyPath": "/etc/wireguard/privatekey",
     "publicKeyPath": "/etc/wireguard/publickey",
     "persistentKeepaliveInterval": 25,
-    "allowedIps": "172.16.0.0/12,10.0.0.0/8,fd00::/8,fe80::/10",
+    "allowedIps": "172.16.0.0/12,fd00::/8,fe80::/10",
     "dnsUpdateInterval": 60,
     "localEndpointHost":"jp-118.dn42.iedon.net",
     "dn42BandwidthCommunity": 24,

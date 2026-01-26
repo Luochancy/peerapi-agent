@@ -18,8 +18,9 @@ type PeerApiResponse struct {
 }
 
 type NodePassthroughRequest struct {
-	ASN  uint `json:"asn"`
-	Data struct {
+	ASN                  uint `json:"asn"`
+	ExistingSessionCount int  `json:"existingSessionCount"`
+	Data                 struct {
 		LinkType      string   `json:"linkType"`
 		BGPExtensions []string `json:"bgpExtensions"`
 	} `json:"data"`
