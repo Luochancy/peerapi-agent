@@ -48,8 +48,10 @@ func configureSession(session *BgpSession) error {
 		return fmt.Errorf("interface configuration failed: %w", err)
 	}
 
+	// Try to install peer probe route, but don't fail the entire session setup if it fails
+	// (it may succeed later when the interface is fully up)
 	if err := ensurePeerProbeIPv6Route(session); err != nil {
-		return fmt.Errorf("peer probe route installation failed: %w", err)
+		log.Printf("Warning: peer probe route installation failed for session %s: %v (will retry later)", session.UUID, err)
 	}
 
 	if err := configureBird(session); err != nil {
