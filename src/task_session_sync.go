@@ -557,6 +557,9 @@ func validateMTU(mtu int) error {
 
 // validateSessionInputs performs comprehensive validation of all session inputs
 func validateSessionInputs(session *BgpSession) error {
+	// Normalize interface name: replace dashes with underscores for consistency
+	session.Interface = strings.ReplaceAll(session.Interface, "-", "_")
+	
 	// Validate interface name
 	if err := validateInterfaceName(session.Interface); err != nil {
 		return err

@@ -369,7 +369,9 @@ func deleteInterface(iface string) error {
 }
 
 func configureBird(session *BgpSession) error {
-	confPath := path.Join(cfg.Bird.BGPPeerConfDir, session.Interface+".conf")
+	// Replace dashes with underscores for file naming consistency
+	sanitizedInterface := strings.ReplaceAll(session.Interface, "-", "_")
+	confPath := path.Join(cfg.Bird.BGPPeerConfDir, sanitizedInterface+".conf")
 	log.Printf("Configuring BIRD for session %s (interface: %s)", session.UUID, session.Interface)
 
 	birdConfMutex.Lock()
@@ -539,7 +541,9 @@ func getBirdSourceAddress() string {
 }
 
 func deleteBird(session *BgpSession) error {
-	confPath := path.Join(cfg.Bird.BGPPeerConfDir, session.Interface+".conf")
+	// Replace dashes with underscores for file naming consistency
+	sanitizedInterface := strings.ReplaceAll(session.Interface, "-", "_")
+	confPath := path.Join(cfg.Bird.BGPPeerConfDir, sanitizedInterface+".conf")
 	// log.Printf("Removing BIRD configuration for session %s (interface: %s)", session.UUID, session.Interface)
 
 	birdConfMutex.Lock()

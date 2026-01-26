@@ -188,7 +188,9 @@ func updateFilterParams() {
 // updateBirdConfig updates the BIRD configuration for a specific session
 // with latency community values
 func updateBirdConfig(session *BgpSession, latencyCommunity, ifBwCommunity, ifSecCommunity int) error {
-	confPath := path.Join(cfg.Bird.BGPPeerConfDir, session.Interface+".conf")
+	// Replace dashes with underscores for file naming consistency
+	sanitizedInterface := strings.ReplaceAll(session.Interface, "-", "_")
+	confPath := path.Join(cfg.Bird.BGPPeerConfDir, sanitizedInterface+".conf")
 	// log.Printf("[FilterParamsUpdater] Updating BIRD config for session %s (interface: %s) with latency community value %d",
 	//	session.UUID, session.Interface, latencyCommunity)
 
