@@ -142,7 +142,9 @@ func metricWorker(jobs <-chan MetricJob, results chan<- MetricResult, wg *sync.W
 
 // collectSessionMetric collects metrics for a single session by querying BIRD directly
 func collectSessionMetric(session BgpSession, timestamp int64) (SessionMetric, error) {
-	sessionName := fmt.Sprintf("DN42_%d_%s", session.ASN, session.Interface)
+	// Replace dashes with underscores for BIRD compatibility
+	sanitizedInterface := strings.ReplaceAll(session.Interface, "-", "_")
+	sessionName := fmt.Sprintf("DN42_%d_%s", session.ASN, sanitizedInterface)
 	mpBGP := slices.Contains(session.Extensions, "mp-bgp")
 
 	var bgpMetrics []BGPMetric
