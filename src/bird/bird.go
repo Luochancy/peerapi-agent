@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -439,6 +440,54 @@ func (bp *BirdPool) ShowProtocols() (string, error) {
 	return output, err
 }
 
+// ShowProtocolsAll executes "show protocols all <name>" and returns the output
+func (bp *BirdPool) ShowProtocolsAll(name string) (string, error) {
+	var output string
+	err := bp.WithConnection(func(conn *BirdConn) error {
+		var buf bytes.Buffer
+		buf.Grow(4096)
+		if err := conn.Write("show protocols all " + name); err != nil {
+			return err
+		}
+		conn.Read(&buf)
+		output = buf.String()
+		return nil
+	})
+	return output, err
+}
+
+// ShowRouteAll executes "show route all" and returns the output
+func (bp *BirdPool) ShowRouteAll() (string, error) {
+	var output string
+	err := bp.WithConnection(func(conn *BirdConn) error {
+		var buf bytes.Buffer
+		buf.Grow(65536) // Route table can be large
+		if err := conn.Write("show route all"); err != nil {
+			return err
+		}
+		conn.Read(&buf)
+		output = buf.String()
+		return nil
+	})
+	return output, err
+}
+
+// ShowRouteForPrefix executes "show route for <prefix>" and returns the output
+func (bp *BirdPool) ShowRouteForPrefix(prefix string) (string, error) {
+	var output string
+	err := bp.WithConnection(func(conn *BirdConn) error {
+		var buf bytes.Buffer
+		buf.Grow(8192)
+		if err := conn.Write("show route for " + prefix); err != nil {
+			return err
+		}
+		conn.Read(&buf)
+		output = buf.String()
+		return nil
+	})
+	return output, err
+}
+
 // This does not affect by pool size, always use a new conn
 func (bp *BirdPool) Configure() (bool, error) {
 	bp.waitForDialWindow()
@@ -577,7 +626,328 @@ var (
 	// Additional optimized patterns for protocol parsing
 	protocolLineRegex = regexp.MustCompile(`^(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(.+)$`)
 	sinceTimeRegex    = regexp.MustCompile(`(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})`)
+
+	// LG parsing patterns
+	routePrefixRegex  = regexp.MustCompile(`^(\S+\s+\S+|\S+)\s+via\s+\S+\s+on\s+(\S+)`)
+	routeUnreachable  = regexp.MustCompile(`^(\S+\s+\S+|\S+)\s+\[.*\]\s+\* \(.*\)`)
+
+	// Protocol summary line: name proto table state since... info...
+	// Example: dn42_abc456 BGP --- up 2025-06-12 16:11:45 Established
+	// Example: dn42_abc456 BGP --- down 2025-06-12 16:11:45 Active
+	protoSummaryRe = regexp.MustCompile(`^(\S+)\s+(\S+)\s+(\S+)\s+(up|down)\s+(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\s*(.*)`)
+
+	// Route entry: prefix [prefs] * (type) info
+	// 172.20.x.x/32         via 10.x.x.x on dn42_xxx [xxx 14:20 from x.x.x.x] * (BGP/...)
+	routeEntryRe = regexp.MustCompile(`^([\d:a-fA-F./]+)\s+(.*)`)
+
+	// Route detail fields
+	routeViaRe    = regexp.MustCompile(`via\s+(\S+)\s+on\s+(\S+)`)
+	routeProtoRe  = regexp.MustCompile(`\((\w+)(?:/(\w+))?\)`)
+	routeSinceRe  = regexp.MustCompile(`(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})`)
+	routeFromRe   = regexp.MustCompile(`from\s+(\S+)`)
+	routeMetricRe = regexp.MustCompile(`metric\s+(\d+)`)
 )
+
+// ProtocolSummary represents a single protocol from "show protocols"
+type ProtocolSummary struct {
+	Name    string `json:"name"`
+	Proto   string `json:"proto"`
+	Table   string `json:"table"`
+	State   string `json:"state"`
+	Since   string `json:"since"`
+	Info    string `json:"info,omitempty"`
+}
+
+// ProtocolDetail represents detailed protocol info from "show protocols all <name>"
+type ProtocolDetail struct {
+	Name         string                     `json:"name"`
+	Proto        string                     `json:"proto"`
+	Table        string                     `json:"table"`
+	State        string                     `json:"state"`
+	Since        string                     `json:"since"`
+	Info         string                     `json:"info,omitempty"`
+	Channels     []ChannelInfo              `json:"channels"`
+}
+
+// ChannelInfo represents a BIRD channel (ipv4/ipv6)
+type ChannelInfo struct {
+	Name     string `json:"name"`
+	State    string `json:"state"`
+	Imported int64  `json:"imported"`
+	Exported int64  `json:"exported"`
+	Filtered int64  `json:"filtered,omitempty"`
+}
+
+// RouteEntry represents a single routing table entry
+type RouteEntry struct {
+	Prefix   string `json:"prefix"`
+	Interface string `json:"interface,omitempty"`
+	Protocol string `json:"protocol,omitempty"`
+	Type     string `json:"type,omitempty"`
+	Since    string `json:"since,omitempty"`
+	From     string `json:"from,omitempty"`
+	Metric   int64  `json:"metric,omitempty"`
+	Primary  bool   `json:"primary"`
+}
+
+// ParseProtocolsSummary parses "show protocols" output into structured data
+// BIRD output format:
+//
+// Name       Proto      Table      State  Since         Info
+// dn42_xxx   BGP        ---        up     2025-06-12 16:11:45  Established
+// static1    Static     master4    up     2025-01-01 00:00:00
+func ParseProtocolsSummary(raw string) []ProtocolSummary {
+	lines := strings.Split(strings.TrimSpace(raw), "\n")
+	var result []ProtocolSummary
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		// Skip header line
+		if strings.HasPrefix(line, "Name ") || strings.HasPrefix(line, "name ") {
+			continue
+		}
+
+		// Try structured regex first
+		if m := protoSummaryRe.FindStringSubmatch(line); len(m) >= 6 {
+			p := ProtocolSummary{
+				Name:  m[1],
+				Proto: m[2],
+				Table: m[3],
+				State: m[4],
+				Since: strings.TrimSpace(m[5]),
+			}
+			if len(m) > 6 {
+				p.Info = strings.TrimSpace(m[6])
+			}
+			result = append(result, p)
+			continue
+		}
+
+		// Fallback: space-separated fields
+		fields := strings.Fields(line)
+		if len(fields) >= 4 {
+			p := ProtocolSummary{
+				Name:  fields[0],
+				Proto: fields[1],
+				Table: fields[2],
+				State: fields[3],
+			}
+			if len(fields) >= 6 {
+				p.Since = fields[4] + " " + fields[5]
+			}
+			if len(fields) >= 7 {
+				p.Info = strings.Join(fields[6:], " ")
+			}
+			result = append(result, p)
+		}
+	}
+
+	return result
+}
+
+// ParseProtocolDetail parses "show protocols all <name>" output into structured data
+// This is more complex as it includes channel information with route counts
+func ParseProtocolDetail(raw string) *ProtocolDetail {
+	lines := strings.Split(strings.TrimSpace(raw), "\n")
+	if len(lines) == 0 {
+		return nil
+	}
+
+	detail := &ProtocolDetail{}
+
+	// Parse first data line (line[1] after header)
+	if len(lines) > 1 {
+		firstLine := strings.TrimSpace(lines[1])
+		if m := protoSummaryRe.FindStringSubmatch(firstLine); len(m) >= 6 {
+			detail.Name = m[1]
+			detail.Proto = m[2]
+			detail.Table = m[3]
+			detail.State = m[4]
+			detail.Since = strings.TrimSpace(m[5])
+			if len(m) > 6 {
+				detail.Info = strings.TrimSpace(m[6])
+			}
+		} else {
+			fields := strings.Fields(firstLine)
+			if len(fields) >= 4 {
+				detail.Name = fields[0]
+				detail.Proto = fields[1]
+				detail.Table = fields[2]
+				detail.State = fields[3]
+				if len(fields) >= 6 {
+					detail.Since = fields[4] + " " + fields[5]
+				}
+				if len(fields) >= 7 {
+					detail.Info = strings.Join(fields[6:], " ")
+				}
+			}
+		}
+	}
+
+	// Parse channels and route counts
+	var currentChannel *ChannelInfo
+	for _, line := range lines[2:] {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		// Channel header: "Channel ipv4" or "Channel ipv6"
+		if m := channelRegex.FindStringSubmatch(line); len(m) > 1 {
+			if currentChannel != nil {
+				detail.Channels = append(detail.Channels, *currentChannel)
+			}
+			currentChannel = &ChannelInfo{
+				Name:  m[1],
+				State: "up",
+			}
+			continue
+		}
+
+		if currentChannel == nil {
+			continue
+		}
+
+		// State: DOWN
+		if stateDownRegex.MatchString(line) {
+			currentChannel.State = "down"
+			continue
+		}
+
+		// Routes: N imported, M filtered, K exported
+		if m := routeLineRegex.FindStringSubmatch(line); len(m) > 2 {
+			currentChannel.Imported, _ = strconv.ParseInt(m[1], 10, 64)
+			currentChannel.Exported, _ = strconv.ParseInt(m[2], 10, 64)
+			continue
+		}
+
+		// Filter count (if present): "  N filtered"
+		if strings.Contains(line, "filtered") && currentChannel != nil {
+			filterRe := regexp.MustCompile(`(\d+)\s+filtered`)
+			if fm := filterRe.FindStringSubmatch(line); len(fm) > 1 {
+				currentChannel.Filtered, _ = strconv.ParseInt(fm[1], 10, 64)
+			}
+		}
+	}
+
+	if currentChannel != nil {
+		detail.Channels = append(detail.Channels, *currentChannel)
+	}
+
+	return detail
+}
+
+// ParseRoutes parses "show route all" output into structured entries
+// BIRD output format:
+// 172.20.x.x/32 unicast [xxx 14:20 from x.x.x.x] * (BGP/...) [ASxxxxx i]
+//     via 10.x.x.x on dn42_xxx
+func ParseRoutes(raw string) []RouteEntry {
+	lines := strings.Split(strings.TrimSpace(raw), "\n")
+	var result []RouteEntry
+
+	var currentPrefix string
+	var currentEntry *RouteEntry
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			// Flush current entry
+			if currentEntry != nil {
+				result = append(result, *currentEntry)
+				currentEntry = nil
+			}
+			continue
+		}
+
+		// New route entry line (starts with a prefix or ::/prefix)
+		if routeEntryRe.MatchString(line) && !strings.HasPrefix(line, "via ") && !strings.HasPrefix(line, "from ") {
+			// Flush previous entry
+			if currentEntry != nil {
+				result = append(result, *currentEntry)
+			}
+
+			// Extract prefix
+			parts := strings.Fields(line)
+			if len(parts) == 0 {
+				continue
+			}
+
+			// Find where "via" starts, or parse inline fields
+			prefix := parts[0]
+			currentPrefix = prefix
+
+			entry := RouteEntry{
+				Prefix:  prefix,
+				Primary: strings.Contains(line, "*"),
+			}
+
+			// Extract protocol type
+			if m := routeProtoRe.FindStringSubmatch(line); len(m) > 1 {
+				entry.Type = m[1]
+				if len(m) > 2 && m[2] != "" {
+					entry.Protocol = m[2]
+				}
+			}
+
+			// Extract since
+			if m := routeSinceRe.FindStringSubmatch(line); len(m) > 1 {
+				entry.Since = m[1]
+			}
+
+			// Extract from (origin)
+			if m := routeFromRe.FindStringSubmatch(line); len(m) > 1 {
+				entry.From = m[1]
+			}
+
+			// Extract metric
+			if m := routeMetricRe.FindStringSubmatch(line); len(m) > 1 {
+				entry.Metric, _ = strconv.ParseInt(m[1], 10, 64)
+			}
+
+			// Extract via/on inline (some routes have it on the same line)
+			if m := routeViaRe.FindStringSubmatch(line); len(m) > 1 {
+				entry.Interface = m[2]
+			}
+
+			currentEntry = &entry
+			continue
+		}
+
+		// Continuation line: "via X on Y"
+		if strings.HasPrefix(line, "via ") || strings.HasPrefix(line, "from ") {
+			if currentEntry != nil {
+				if m := routeViaRe.FindStringSubmatch(line); len(m) > 1 {
+					currentEntry.Interface = m[2]
+				}
+			}
+			continue
+		}
+
+		// If we're here, it's a multi-line entry detail
+		// Try to extract any additional info
+		if currentEntry != nil {
+			if m := routeViaRe.FindStringSubmatch(line); len(m) > 1 {
+				currentEntry.Interface = m[2]
+			}
+			if m := routeFromRe.FindStringSubmatch(line); len(m) > 1 && currentEntry.From == "" {
+				currentEntry.From = m[1]
+			}
+		}
+
+		_ = currentPrefix
+	}
+
+	// Flush last entry
+	if currentEntry != nil {
+		result = append(result, *currentEntry)
+	}
+
+	return result
+}
 
 // Compile patterns once at package initialization for optimal performance
 func init() {

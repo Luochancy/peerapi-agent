@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/iedon/peerapi-agent/bird"
 )
 
 // Helper functions for HTTP response handling
@@ -48,7 +49,12 @@ func initRouter(mux *http.ServeMux) http.Handler {
 	mux.HandleFunc("/status", withAuth(status))
 	mux.HandleFunc("/sync", withAuth(manualSync))
 	mux.HandleFunc("/info", withAuth(nodePassthroughInfo))
-	mux.HandleFunc("/lg/protocols", withAuth(lgProtocols))
+
+	// Looking Glass routes (Go 1.22+ path parameters)
+	mux.HandleFunc("GET /lg/protocols", withAuth(lgProtocols))
+	mux.HandleFunc("GET /lg/protocols/{name}", withAuth(lgProtocols))
+	mux.HandleFunc("GET /lg/routes", withAuth(lgRoutes))
+	mux.HandleFunc("GET /lg/routes/{prefix...}", withAuth(lgRoutes))
 
 	// Apply middleware in reverse order (last applied = first executed)
 	var handler http.Handler = mux
@@ -217,11 +223,18 @@ func getGREPassthroughInfo(w http.ResponseWriter, req *NodePassthroughRequest, i
 	})
 }
 
-// lgProtocols returns BIRD protocol status for Looking Glass
+// lgProtocols returns structured BIRD protocol status for Looking Glass
 func lgProtocols(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		w.Header().Set("Allow", "GET")
 		sendJSONResponse(w, http.StatusMethodNotAllowed, "Method not allowed", nil)
+		return
+	}
+
+	// Check for path parameter: /lg/protocols/{name}
+	name := r.PathValue("name")
+	if name != "" {
+		lgProtocolDetail(w, r, name)
 		return
 	}
 
@@ -231,7 +244,81 @@ func lgProtocols(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sendJSONResponse(w, 0, "OK", map[string]string{
-		"protocols": output,
+	protocols := bird.ParseProtocolsSummary(output)
+	sendJSONResponse(w, 0, "OK", map[string]any{
+		"protocols": protocols,
+	})
+}
+
+// lgProtocolDetail returns detailed info for a single protocol
+func lgProtocolDetail(w http.ResponseWriter, r *http.Request, name string) {
+	// Sanitize name to prevent command injection
+	if strings.ContainsAny(name, ";\n\r\t") {
+		sendJSONResponse(w, http.StatusBadRequest, "Invalid protocol name", nil)
+		return
+	}
+
+	output, err := birdPool.ShowProtocolsAll(name)
+	if err != nil {
+		sendJSONResponse(w, http.StatusInternalServerError, fmt.Sprintf("Failed to query BIRD: %v", err), nil)
+		return
+	}
+
+	detail := bird.ParseProtocolDetail(output)
+	if detail == nil || detail.Name == "" {
+		sendJSONResponse(w, http.StatusNotFound, fmt.Sprintf("Protocol '%s' not found", name), nil)
+		return
+	}
+
+	sendJSONResponse(w, 0, "OK", detail)
+}
+
+// lgRoutes returns BIRD routing table for Looking Glass
+func lgRoutes(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", "GET")
+		sendJSONResponse(w, http.StatusMethodNotAllowed, "Method not allowed", nil)
+		return
+	}
+
+	// Check for path parameter: /lg/routes/{prefix...}
+	prefix := r.PathValue("prefix")
+	if prefix != "" {
+		lgRoutesForPrefix(w, r, prefix)
+		return
+	}
+
+	output, err := birdPool.ShowRouteAll()
+	if err != nil {
+		sendJSONResponse(w, http.StatusInternalServerError, fmt.Sprintf("Failed to query BIRD: %v", err), nil)
+		return
+	}
+
+	routes := bird.ParseRoutes(output)
+	sendJSONResponse(w, 0, "OK", map[string]any{
+		"routes": routes,
+		"total":  len(routes),
+	})
+}
+
+// lgRoutesForPrefix returns routes for a specific prefix
+func lgRoutesForPrefix(w http.ResponseWriter, r *http.Request, prefix string) {
+	// Validate prefix format (basic check)
+	if !strings.ContainsAny(prefix, "./:") {
+		sendJSONResponse(w, http.StatusBadRequest, "Invalid prefix format", nil)
+		return
+	}
+
+	output, err := birdPool.ShowRouteForPrefix(prefix)
+	if err != nil {
+		sendJSONResponse(w, http.StatusInternalServerError, fmt.Sprintf("Failed to query BIRD: %v", err), nil)
+		return
+	}
+
+	routes := bird.ParseRoutes(output)
+	sendJSONResponse(w, 0, "OK", map[string]any{
+		"prefix": prefix,
+		"routes": routes,
+		"total":  len(routes),
 	})
 }
