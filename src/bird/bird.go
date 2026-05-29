@@ -423,6 +423,22 @@ func (bp *BirdPool) ShowStatus() (string, error) {
 	return output, err
 }
 
+// ShowProtocols executes "show protocols" and returns the output
+func (bp *BirdPool) ShowProtocols() (string, error) {
+	var output string
+	err := bp.WithConnection(func(conn *BirdConn) error {
+		var buf bytes.Buffer
+		buf.Grow(8192) // Pre-allocate buffer for protocols output
+		if err := conn.Write("show protocols"); err != nil {
+			return err
+		}
+		conn.Read(&buf)
+		output = buf.String()
+		return nil
+	})
+	return output, err
+}
+
 // This does not affect by pool size, always use a new conn
 func (bp *BirdPool) Configure() (bool, error) {
 	bp.waitForDialWindow()

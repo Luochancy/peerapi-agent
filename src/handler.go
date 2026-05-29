@@ -48,6 +48,7 @@ func initRouter(mux *http.ServeMux) http.Handler {
 	mux.HandleFunc("/status", withAuth(status))
 	mux.HandleFunc("/sync", withAuth(manualSync))
 	mux.HandleFunc("/info", withAuth(nodePassthroughInfo))
+	mux.HandleFunc("/lg/protocols", withAuth(lgProtocols))
 
 	// Apply middleware in reverse order (last applied = first executed)
 	var handler http.Handler = mux
@@ -213,5 +214,24 @@ func getGREPassthroughInfo(w http.ResponseWriter, req *NodePassthroughRequest, i
 			endpoint,
 			tunnelType,
 		),
+	})
+}
+
+// lgProtocols returns BIRD protocol status for Looking Glass
+func lgProtocols(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", "GET")
+		sendJSONResponse(w, http.StatusMethodNotAllowed, "Method not allowed", nil)
+		return
+	}
+
+	output, err := birdPool.ShowProtocols()
+	if err != nil {
+		sendJSONResponse(w, http.StatusInternalServerError, fmt.Sprintf("Failed to query BIRD: %v", err), nil)
+		return
+	}
+
+	sendJSONResponse(w, 0, "OK", map[string]string{
+		"protocols": output,
 	})
 }
