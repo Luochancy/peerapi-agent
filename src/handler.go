@@ -50,11 +50,11 @@ func initRouter(mux *http.ServeMux) http.Handler {
 	mux.HandleFunc("/sync", withAuth(manualSync))
 	mux.HandleFunc("/info", withAuth(nodePassthroughInfo))
 
-	// Looking Glass routes (Go 1.22+ path parameters)
-	mux.HandleFunc("GET /lg/protocols", withAuth(lgProtocols))
-	mux.HandleFunc("GET /lg/protocols/{name}", withAuth(lgProtocols))
-	mux.HandleFunc("GET /lg/routes", withAuth(lgRoutes))
-	mux.HandleFunc("GET /lg/routes/{prefix...}", withAuth(lgRoutes))
+	// Looking Glass routes (Go 1.22+ path parameters) — public, no auth (API layer handles permissions)
+	mux.HandleFunc("GET /lg/protocols", lgProtocols)
+	mux.HandleFunc("GET /lg/protocols/{name}", lgProtocols)
+	mux.HandleFunc("GET /lg/routes", lgRoutes)
+	mux.HandleFunc("GET /lg/routes/{prefix...}", lgRoutes)
 
 	// Apply middleware in reverse order (last applied = first executed)
 	var handler http.Handler = mux
