@@ -201,6 +201,9 @@ func processBatchRTT(ctx context.Context, sessions []BgpSession) {
 
 	// Create a worker pool with a reasonable number of workers
 	workerCount := min(len(sessions), cfg.Metric.PingWorkerCount)
+	if workerCount == 0 {
+		workerCount = min(len(sessions), 8) // Default fallback
+	}
 
 	// Create channels for work distribution
 	jobs := make(chan BgpSession, len(sessions))

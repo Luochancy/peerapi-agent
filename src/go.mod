@@ -1,6 +1,6 @@
 module github.com/iedon/peerapi-agent
 
-go 1.25.1
+go 1.24
 
 replace github.com/iedon/peerapi-agent/bird => ./bird
 

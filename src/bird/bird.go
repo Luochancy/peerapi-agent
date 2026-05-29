@@ -253,6 +253,18 @@ func (bp *BirdPool) ReleaseConnection(pc *PooledConnection) {
 		return
 	}
 
+	// Check if pool is shutting down
+	select {
+	case <-bp.shutdown:
+		// Pool is shutting down, close the connection directly
+		if pc.conn != nil {
+			pc.conn.Close()
+		}
+		return
+	default:
+		// Pool is still active
+	}
+
 	bp.Lock()
 	pc.inUse = false
 	pc.lastUsed = time.Now()

@@ -234,9 +234,13 @@ func updateBirdConfig(session *BgpSession, latencyCommunity, ifBwCommunity, ifSe
 		filterParamsIPv4 := composeFilterParams(latencyCommunity, ifBwCommunity, ifSecCommunity, session.Policy, probeStatusFlag(session.UUID, probeFamilyIPv4))
 		filterParamsIPv6 := composeFilterParams(latencyCommunity, ifBwCommunity, ifSecCommunity, session.Policy, probeStatusFlag(session.UUID, probeFamilyIPv6))
 
+		sourceAddr := getBirdSourceAddress()
+
 		templateData := BirdTemplateData{
 			SessionName:       sessionName,
+			Interface:         sanitizedInterface,
 			InterfaceAddr:     interfaceAddr,
+			SourceAddress:     sourceAddr,
 			ASN:               session.ASN,
 			IPv4ShouldImport:  true,
 			IPv4ShouldExport:  true,
@@ -263,9 +267,13 @@ func updateBirdConfig(session *BgpSession, latencyCommunity, ifBwCommunity, ifSe
 				interfaceAddr = session.IPv6
 			}
 
+			sourceAddr := getBirdSourceAddress()
+
 			templateData := BirdTemplateData{
 				SessionName:       sessionName + "_v6",
+				Interface:         sanitizedInterface,
 				InterfaceAddr:     interfaceAddr,
+				SourceAddress:     sourceAddr,
 				ASN:               session.ASN,
 				IPv4ShouldImport:  false,
 				IPv4ShouldExport:  false,
@@ -285,9 +293,13 @@ func updateBirdConfig(session *BgpSession, latencyCommunity, ifBwCommunity, ifSe
 		if session.IPv4 != "" {
 			filterParamsIPv4 := composeFilterParams(latencyCommunity, ifBwCommunity, ifSecCommunity, session.Policy, probeStatusFlag(session.UUID, probeFamilyIPv4))
 			filterParamsIPv6 := composeFilterParams(latencyCommunity, ifBwCommunity, ifSecCommunity, session.Policy, probeStatusFlag(session.UUID, probeFamilyIPv6))
+			sourceAddr := getBirdSourceAddress()
+
 			templateData := BirdTemplateData{
 				SessionName:       sessionName + "_v4",
+				Interface:         sanitizedInterface,
 				InterfaceAddr:     session.IPv4,
+				SourceAddress:     sourceAddr,
 				ASN:               session.ASN,
 				IPv4ShouldImport:  true,
 				IPv4ShouldExport:  true,

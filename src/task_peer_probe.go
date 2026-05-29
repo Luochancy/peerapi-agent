@@ -71,7 +71,7 @@ func peerProbeTask(ctx context.Context, wg *sync.WaitGroup) {
 	}
 
 	if err := initPeerProbe(); err != nil {
-		log.Fatalf("[PeerProbe] Failed to initialize peer probe task: %v", err)
+		log.Printf("[PeerProbe] Failed to initialize peer probe task: %v", err)
 		return
 	}
 
@@ -123,6 +123,9 @@ func runPeerProbe(ctx context.Context) {
 
 	start := time.Now()
 	workerCount := min(len(sessions), cfg.PeerProbe.SessionWorkerCount)
+	if workerCount == 0 {
+		workerCount = min(len(sessions), 8) // Default fallback
+	}
 	jobs := make(chan BgpSession, len(sessions))
 	results := make(chan bool, len(sessions))
 
