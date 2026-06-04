@@ -37,7 +37,6 @@
 | Bun | 1.0+ |
 | MySQL | 5.7+ 或 8.0+ |
 | Redis | 6.0+ |
-| OpenSSH | 用于 SSH 认证服务（端口 4222） |
 
 ### 1.2 安装
 
@@ -98,6 +97,16 @@ probeServerSettings: {
   enabled: true,
   bindUdpPort: 2189,
   encryptionKey: 'YOUR_32_BYTE_PROBE_KEY',  // 必须与 agent 一致
+},
+
+// SSH 认证服务器（可选）— DN42 用户通过 SSH 公钥证明 ASN 所有权
+// 用户 SSH 进来后获取一次性 challenge code，复制回前端完成认证
+sshAuthServerSettings: {
+  ssh2: {
+    listen: { type: 'tcp', port: 4222, hostname: 'localhost' },
+    hostKeysPath: ['/etc/ssh/ssh_host_rsa_key'],
+    timeoutSeconds: 120,
+  }
 },
 ```
 
