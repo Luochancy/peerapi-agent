@@ -1,0 +1,138 @@
+{
+  "server": {
+    "debug": false,
+    "listenerType": "tcp",
+    "listen": ":8080",
+    "readTimeout": 30,
+    "writeTimeout": 30,
+    "idleTimeout": 120,
+    "writeBufferSize": 8192,
+    "readBufferSize": 8192,
+    "bodyLimit": 1048576,
+    "trustedProxies": [
+      "127.0.0.1",
+      "::1"
+    ]
+  },
+  "ipConfig": {
+    "ipv4": "172.23.126.2",
+    "ipv6": "fd00:1145:1419::2",
+    "ipv6LinkLocal": "fe80::1857:239"
+  },
+  "logger": {
+    "file": "./logs/peerapi-agent.log",
+    "maxSize": 10,
+    "maxBackups": 10,
+    "maxAge": 30,
+    "compress": true,
+    "consoleLogging": true
+  },
+  "peerApiCenter": {
+    "apiUrl": "https://api.dn42.luocynet.com",
+    "probeServerIPv4": "172.23.126.58",
+    "probeServerIPv6": "fd00:1145:1419::2",
+    "probeServerIPv6Prefix": "fd00:1145:1419::/48",
+    "probeServerPort": 11451,
+    "secret": "hJ9b4CmqBR3SEQ8gGohHAvTB",
+    "requestTimeout": 15,
+    "routerUuid": "",
+    "agentSecret": "",
+    "heartbeatInterval": 30,
+    "syncInterval": 300,
+    "metricInterval": 60,
+    "wanInterfaces": [
+      "eth0"
+    ],
+    "sessionPassthroughJwtSecert": "fpX4Fgkcz6CiczGpIwu+gAts",
+    "interfaceIpAllowPublic": false,
+    "interfaceIpBlacklist": [
+      "192.168.0.0/16",
+      "10.0.0.0/8",
+      "172.16.0.0/16",
+      "172.17.0.0/16",
+      "172.18.0.0/16",
+      "172.19.0.0/16",
+      "172.24.0.0/16",
+      "172.25.0.0/16",
+      "172.26.0.0/16",
+      "172.27.0.0/16",
+      "172.28.0.0/16",
+      "172.29.0.0/16",
+      "172.30.0.0/16",
+      "172.31.0.0/16",
+      "127.0.0.0/8",
+      "224.0.0.0/4",
+      "::1/128",
+      "ff00::/8",
+      "fd00:1145:1419::/48",
+      "172.20.0.53/32",
+      "fd42:d42:d42:54::/64"
+    ]
+  },
+  "bird": {
+    "controlSocket": "/var/run/bird/bird.ctl",
+    "poolSize": 5,
+    "poolSizeMax": 64,
+    "connectionMaxRetries": 5,
+    "connectionRetryDelayMs": 50,
+    "bgpPeerConfDir": "/etc/bird/peers",
+    "bgpPeerConfTemplateFile": "./templates/peer.conf",
+    "ipCommandPath": "/usr/sbin/ip"
+  },
+  "sysctl": {
+    "commandPath": "/usr/sbin/sysctl",
+    "ifaceIpForwarding": true,
+    "ifaceIp6Forwarding": true,
+    "ifaceIp6AcceptRa": false,
+    "ifaceIp6AutoConfig": false,
+    "ifaceRpFilter": 0,
+    "ifaceAcceptLocal": true
+  },
+  "metric": {
+    "autoTeardown": true,
+    "maxMindGeoLiteCountryMmdbPath": "",
+    "geoIpCountryMode": "blacklist",
+    "blacklistGeoCountries": [
+      "CN"
+    ],
+    "whitelistGeoCountries": [],
+    "pingCommandPath": "/usr/bin/ping",
+    "pingTimeout": 5,
+    "pingCount": 2,
+    "pingCountOnFail": 1,
+    "pingWorkerCount": 64,
+    "sessionWorkerCount": 64,
+    "maxRTTMetricsHistroy": 288,
+    "geoCheckInterval": 900,
+    "filterParamsUpdateInterval": 3600
+  },
+  "wireguard": {
+    "wgCommandPath": "/usr/bin/wg",
+    "privateKeyPath": "/etc/wireguard/privatekey",
+    "publicKeyPath": "/etc/wireguard/publickey",
+    "persistentKeepaliveInterval": 25,
+    "allowedIps": "172.16.0.0/12,10.0.0.0/8,fd00::/8,fe80::/10",
+    "dnsUpdateInterval": 60,
+    "localEndpointHost": "jp1.dn42.luocynet.com",
+    "dn42BandwidthCommunity": 24,
+    "dn42InterfaceSecurityCommunity": 34
+  },
+  "gre": {
+    "localEndpointHost4": "156.231.115.239",
+    "localEndpointHost6": "2602:fa4f:B00:745b:4506:594e:929:6f40",
+    "localEndpointDesc4": "156.231.115.239 (JP1)",
+    "localEndpointDesc6": "2602:fa4f:B00:745b:4506:594e:929:6f40 (JP1)",
+    "dn42BandwidthCommunity": 24,
+    "dn42InterfaceSecurityCommunity": 31
+  },
+  "peerProbe": {
+    "enabled": true,
+    "intervalSeconds": 300,
+    "probePacketCount": 5,
+    "probePacketIntervalMs": 100,
+    "probePacketEncryptionKey": "5c136a14bec356e1eb3c7fece234d0aa",
+    "sessionWorkerCount": 32,
+    "probePacketBanner": "iEdon-Net PeerAPI Peering Prober",
+    "probeSummaryCooldownSeconds": 30
+  }
+}
