@@ -48,6 +48,11 @@ func main() {
 		return
 	}
 
+	// Generate default config if not exists
+	if err := ensureConfig(*configFile); err != nil {
+		log.Fatalf("Failed to create default config: %v\n", err)
+	}
+
 	// Create a root context for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
