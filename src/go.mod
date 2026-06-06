@@ -5,6 +5,7 @@ go 1.24
 replace github.com/iedon/peerapi-agent/bird => ./bird
 
 require (
+	github.com/BurntSushi/toml v1.5.0
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/matishsiao/goInfo v0.0.0-20241216093258-66a9250504d6
 	github.com/oschwald/geoip2-golang v1.11.0

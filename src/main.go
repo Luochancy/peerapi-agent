@@ -38,7 +38,7 @@ var rttTrackers = make(map[string]*RTTTracker) // Key is session.UUID
 var rttMutex sync.RWMutex                      // Dedicated mutex for RTT-related operations
 
 func main() {
-	configFile := flag.String("c", "config.json", "Path to the JSON configuration file")
+	configFile := flag.String("c", "config/config.toml", "Path to the TOML configuration file")
 	help := flag.Bool("h", false, "Print this message")
 	flag.Parse()
 
