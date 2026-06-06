@@ -332,27 +332,27 @@ func writeDefaultConfig(path string) error {
 # Edit this file to match your node, then restart the agent.
 
 [ipConfig]
-ipv4 = "172.23.126.2"
-ipv6 = "fd00:1145:1419::2"
-ipv6LinkLocal = "fe80::1857:239"
+ipv4 = ""
+ipv6 = ""
+ipv6LinkLocal = ""
 
 [peerApiCenter]
 apiUrl = "http://127.0.0.1:13000"
-secret = "hJ9b4CmqBR3SEQ8gGohHAvTB"
+secret = ""
 routerUuid = ""
 agentSecret = ""
 requestTimeout = 15
-probeServerIPv4 = "172.23.126.58"
-probeServerIPv6 = "fd00:1145:1419::2"
-probeServerIPv6Prefix = "fd00:1145:1419::/48"
-probeServerPort = 11451
+probeServerIPv4 = ""
+probeServerIPv6 = ""
+probeServerIPv6Prefix = ""
+probeServerPort = 2189
 heartbeatInterval = 30
 syncInterval = 300
 metricInterval = 60
 wanInterfaces = ["eth0"]
-sessionPassthroughJwtSecert = "fpX4Fgkcz6CiczGpIwu+gAts"
+sessionPassthroughJwtSecert = ""
 interfaceIpAllowPublic = false
-interfaceIpBlacklist = ["192.168.0.0/16","172.16.0.0/16","10.0.0.0/8","127.0.0.0/8","224.0.0.0/4","::1/128","ff00::/8","172.20.0.53/32","fd42:d42:d42:54::/64","fd00:1145:1419::/48"]
+interfaceIpBlacklist = []
 
 [wireguard]
 wgCommandPath = "/usr/bin/wg"
@@ -361,15 +361,15 @@ publicKeyPath = "/etc/wireguard/publickey"
 persistentKeepaliveInterval = 25
 allowedIps = "172.16.0.0/12,10.0.0.0/8,fd00::/8,fe80::/10"
 dnsUpdateInterval = 60
-localEndpointHost = "156.231.115.239"
+localEndpointHost = ""
 dn42BandwidthCommunity = 24
 dn42InterfaceSecurityCommunity = 34
 
 [gre]
-localEndpointHost4 = "156.231.115.239"
-localEndpointHost6 = "2602:fa4f:B00:745b:4506:594e:929:6f40"
-localEndpointDesc4 = "156.231.115.239 (JP1)"
-localEndpointDesc6 = "2602:fa4f:B00:745b:4506:594e:929:6f40 (JP1)"
+localEndpointHost4 = ""
+localEndpointHost6 = ""
+localEndpointDesc4 = ""
+localEndpointDesc6 = ""
 dn42BandwidthCommunity = 24
 dn42InterfaceSecurityCommunity = 31
 
@@ -378,9 +378,9 @@ enabled = true
 intervalSeconds = 300
 probePacketCount = 5
 probePacketIntervalMs = 100
-probePacketEncryptionKey = "5c136a14bec356e1eb3c7fece234d0aa"
+probePacketEncryptionKey = ""
 sessionWorkerCount = 32
-probePacketBanner = "iEdon-Net PeerAPI Peering Prober"
+probePacketBanner = ""
 probeSummaryCooldownSeconds = 30
 
 [logger]
@@ -395,7 +395,7 @@ consoleLogging = true
 autoTeardown = true
 maxMindGeoLiteCountryMmdbPath = ""
 geoIpCountryMode = "blacklist"
-blacklistGeoCountries = ["CN"]
+blacklistGeoCountries = []
 whitelistGeoCountries = []
 pingCommandPath = "/usr/bin/ping"
 pingTimeout = 5
