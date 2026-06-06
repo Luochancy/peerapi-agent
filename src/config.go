@@ -218,6 +218,12 @@ func ensureConfig(path string) error {
 	_, err := os.Stat(dir)
 	if err == nil {
 		if _, err := os.Stat(path); os.IsNotExist(err) {
+			// Check if user forgot to rename .default
+			defaultPath := path + ".default"
+			if _, err := os.Stat(defaultPath); err == nil {
+				return fmt.Errorf("%s not found but %s exists. Rename %s to %s and edit it",
+					path, defaultPath, defaultPath, path)
+			}
 			return fmt.Errorf("%s not found. Copy %s.default to %s and edit it",
 				path, path, path)
 		}
@@ -284,8 +290,38 @@ ifaceAcceptLocal = true
 		}
 	}
 
+	// Write BIRD peer config template
+	templatesDir := "templates"
+	if err := os.MkdirAll(templatesDir, 0755); err != nil {
+		return err
+	}
+	peerConf := `###########################################
+##                WARNING                ##
+###########################################
+#                                         #
+#  This file is managed by iEdon PeerAPI. #
+#                                         #
+#  DO NOT EDIT OR DELETE THIS FILE IF YOU #
+#  ARE NOT SURE.                          #
+###########################################
+
+protocol bgp {{ .SessionName }} from dnpeers {
+    neighbor {{ .InterfaceAddr }} as {{ .ASN }};
+    {{- if .SourceAddress }}
+    source address {{ .SourceAddress }};
+    {{- end }}
+    {{- if .ExtendedNextHopOn }}
+    ipv4 { extended next hop on; };
+    {{- end }};
+}
+`
+	if err := os.WriteFile(filepath.Join(templatesDir, "peer.conf"), []byte(peerConf), 0644); err != nil {
+		return err
+	}
+
 	fmt.Printf("Default config written to %s.\n", defaultPath)
 	fmt.Println("Overlay templates (server.toml.default, bird.toml.default, sysctl.toml.default) created.")
+	fmt.Println("BIRD peer config template written to templates/peer.conf.")
 	fmt.Printf("Copy %s.default to %s, edit to match your node, then run again.\n", path, path)
 	os.Exit(0)
 	return nil
