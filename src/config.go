@@ -215,7 +215,8 @@ func loadConfig(filename string) (*config, error) {
 func ensureConfig(path string) error {
 	dir := filepath.Dir(path)
 
-	if _, err := os.Stat(dir); err == nil {
+	_, err := os.Stat(dir)
+	if err == nil {
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			return fmt.Errorf("%s not found. Copy %s.default to %s and edit it",
 				path, path, path)
