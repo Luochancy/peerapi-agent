@@ -42,20 +42,11 @@ jobs:
         working-directory: ./src
         run: GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o peerapi-agent_${{ matrix.goos }}_${{ matrix.goarch }}
 
-      - name: Package with config
-        shell: bash
-        run: |
-          PKG_DIR="peerapi-agent_${{ matrix.goos }}_${{ matrix.goarch }}"
-          mkdir -p "$PKG_DIR/config"
-          cp "src/peerapi-agent_${{ matrix.goos }}_${{ matrix.goarch }}" "$PKG_DIR/"
-          cp config/config.toml "$PKG_DIR/config/"
-          cp config/*.default "$PKG_DIR/config/"
-
       - name: Upload binaries
         uses: actions/upload-artifact@v4
         with:
           name: peerapi-agent_${{ matrix.goos }}_${{ matrix.goarch }}
-          path: peerapi-agent_${{ matrix.goos }}_${{ matrix.goarch }}
+          path: ./src/peerapi-agent_${{ matrix.goos }}_${{ matrix.goarch }}
 
   release:
     needs: compile
