@@ -352,7 +352,7 @@ metricInterval = 60
 wanInterfaces = ["eth0"]
 sessionPassthroughJwtSecert = ""
 interfaceIpAllowPublic = false
-interfaceIpBlacklist = []
+interfaceIpBlacklist = ["192.168.0.0/16","172.16.0.0/12","10.0.0.0/8","127.0.0.0/8","224.0.0.0/4","::1/128","ff00::/8","fe80::/10","fd00::/8"]
 
 [wireguard]
 wgCommandPath = "/usr/bin/wg"
