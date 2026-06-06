@@ -1,0 +1,114 @@
+# ============================================================
+# peerapi-agent 主配置文件
+# 节点相关的核心配置，每个节点必须按实际情况填写
+# ============================================================
+
+# ---- 节点 IP 地址池 ----
+# 用于给每个 BGP session 的 WG/GRE 接口分配本端地址
+[ipConfig]
+ipv4 = "172.23.126.2"            # 本端 IPv4 地址池，新 session 取 /32
+ipv6 = "fd00:1145:1419::2"       # 本端 IPv6 地址池，取 /128
+ipv6LinkLocal = "fe80::1857:239" # IPv6 link-local 地址，多跳 BGP 邻居必须
+
+
+# ---- 中心 API 通讯 ----
+[peerApiCenter]
+# 核心通讯
+apiUrl = "http://127.0.0.1:13000"           # API 服务器地址。心跳/上报指标/同步 session 全走这
+secret = "hJ9b4CmqBR3SEQ8gGohHAvTB"        # 与 API 双向 HMAC 认证的共享密钥
+routerUuid = ""                              # 本节点在 API 注册的 UUID，为空则首次启动自动注册
+agentSecret = ""                             # API 下发到 agent 的 Bearer token
+requestTimeout = 15                          # 向 API 发起 HTTP 请求的超时(秒)
+
+# Probe 探针服务器
+probeServerIPv4 = "172.23.126.58"           # Probe 数据包的目标 IPv4
+probeServerIPv6 = "fd00:1145:1419::2"       # Probe 数据包的目标 IPv6
+probeServerIPv6Prefix = "fd00:1145:1419::/48"  # Probe 包 v6 路由的 next-hop 前缀
+probeServerPort = 11451                      # Probe 的 UDP 端口
+
+# 定时任务频率
+heartbeatInterval = 30     # 心跳间隔(秒)
+syncInterval = 300         # 从 API 同步 session 列表间隔(秒)
+metricInterval = 60        # 采集并上报 RTT/流量指标间隔(秒)，最低 60
+
+# 接口/网络
+wanInterfaces = ["eth0"]                         # 要监控流量的外网接口名列表
+sessionPassthroughJwtSecert = "fpX4Fgkcz6CiczGpIwu+gAts"  # session 信息 JWT 签名密钥
+interfaceIpAllowPublic = false                   # 是否允许给 session 接口分配公网 IP
+interfaceIpBlacklist = [                         # 禁止分配给 session 接口的 IP 段
+    "192.168.0.0/16",
+    "172.16.0.0/16",
+    "10.0.0.0/8",
+    "127.0.0.0/8",
+    "224.0.0.0/4",
+    "::1/128",
+    "ff00::/8",
+    "172.20.0.53/32",
+    "fd42:d42:d42:54::/64",
+    "fd00:1145:1419::/48",
+]
+
+
+# ---- WireGuard 隧道参数 ----
+[wireguard]
+wgCommandPath = "/usr/bin/wg"                         # wg 命令路径
+privateKeyPath = "/etc/wireguard/privatekey"          # WG 私钥文件路径
+publicKeyPath = "/etc/wireguard/publickey"            # WG 公钥文件路径
+persistentKeepaliveInterval = 25                      # WG peer 保活间隔(秒)
+allowedIps = "172.16.0.0/12,10.0.0.0/8,fd00::/8,fe80::/10"  # 新建 WG peer 默认 AllowedIPs
+dnsUpdateInterval = 60                                # 重新解析 peer 域名 endpoint 的间隔(秒)
+localEndpointHost = "156.231.115.239"                  # 本节点 WG 公网端点地址
+dn42BandwidthCommunity = 24                           # DN42 BGP 带宽社区值(WG)
+dn42InterfaceSecurityCommunity = 34                   # DN42 BGP 安全社区值(WG)
+
+
+# ---- GRE 隧道参数 ----
+[gre]
+localEndpointHost4 = "156.231.115.239"          # GRE IPv4 公网端点
+localEndpointHost6 = "2602:fa4f:B00:745b:4506:594e:929:6f40"  # GRE IPv6 公网端点(空=不支持)
+localEndpointDesc4 = "156.231.115.239 (JP1)"    # IPv4 端点描述(显示给对端)
+localEndpointDesc6 = "2602:fa4f:B00:745b:4506:594e:929:6f40 (JP1)"  # IPv6 端点描述
+dn42BandwidthCommunity = 24                     # DN42 BGP 带宽社区值(GRE)
+dn42InterfaceSecurityCommunity = 31             # DN42 BGP 安全社区值(GRE)
+
+
+# ---- 会话探针 ----
+[peerProbe]
+enabled = true                                       # 是否启用探针
+intervalSeconds = 300                                # 每轮探针间隔(秒)
+probePacketCount = 5                                 # 每轮每个 session 发几个 probe 包
+probePacketIntervalMs = 100                          # 同 session probe 包间隔(毫秒)
+probePacketEncryptionKey = "5c136a14bec356e1eb3c7fece234d0aa"  # Probe 包加密密钥
+sessionWorkerCount = 32                              # 并发 probe worker 数
+probePacketBanner = "iEdon-Net PeerAPI Peering Prober"  # Probe 包标识字符串
+probeSummaryCooldownSeconds = 30                     # probe 摘要 API 冷却时间(秒)
+
+
+# ---- 日志 ----
+[logger]
+file = "./logs/peerapi-agent.log"  # 日志文件路径
+maxSize = 10                       # 单文件最大 MB，超了轮转
+maxBackups = 10                    # 保留的旧日志文件最大份数
+maxAge = 30                        # 旧日志最大保留天数
+compress = true                    # 轮转后是否 gzip 压缩
+consoleLogging = true              # 同时输出到控制台
+
+
+# ---- RTT/性能采集与 GeoIP 规则 ----
+# 这里主要是探测定时任务相关的参数，大部分用默认即可
+[metric]
+autoTeardown = true                              # 根据指标自动拆除 session
+maxMindGeoLiteCountryMmdbPath = ""                # GeoIP 数据库路径，空=不启用 GeoIP
+geoIpCountryMode = "blacklist"                    # GeoIP 模式: blacklist / whitelist
+blacklistGeoCountries = ["CN"]                    # 黑名单国家(IP 所在地)
+whitelistGeoCountries = []                         # 白名单国家
+
+pingCommandPath = "/usr/bin/ping"       # ping 命令路径
+pingTimeout = 5                         # ping 超时(秒)
+pingCount = 2                           # 每轮 ping 次数
+pingCountOnFail = 1                     # 失败后重试 ping 次数(避免阻塞)
+pingWorkerCount = 64                    # 并发 ping worker 数
+sessionWorkerCount = 64                 # 并发 session 指标采集 worker 数
+maxRTTMetricsHistroy = 288              # 保留多少条历史 RTT(用于平均/抖动计算)
+geoCheckInterval = 900                  # GeoIP 检查间隔(秒)
+filterParamsUpdateInterval = 3600       # DN42 BGP 社区更新间隔(秒)

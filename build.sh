@@ -13,6 +13,9 @@ go mod tidy
 go build -o ../dist/peerapi-agent -ldflags="-X main.GIT_COMMIT=$(git rev-parse --short HEAD)"
 
 cd ..
-cp config.json ./dist/config.json
+mkdir -p ./dist/config
+cp config/config.toml ./dist/config/config.toml
+cp config/server.toml.default config/bird.toml.default config/sysctl.toml.default ./dist/config/
+[ -f config.json.example ] && cp config.json.example ./dist/config/
 
 echo "Build completed."
