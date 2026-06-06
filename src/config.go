@@ -209,26 +209,23 @@ func loadConfig(filename string) (*config, error) {
 }
 
 // ensureConfig checks config state and generates defaults if needed.
-//   - config/ missing: create dir, write config.toml.default, exit.
+//   - config/ missing: create dir, write all .default files, exit.
 //   - config/ exists but config.toml missing: error, refuse to start.
 //   - config.toml exists: proceed normally.
 func ensureConfig(path string) error {
 	dir := filepath.Dir(path)
 
-	// Check if config directory exists
 	if _, err := os.Stat(dir); err == nil {
-		// config/ exists — check if config.toml is present
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			return fmt.Errorf("%s not found. Copy %s.default to %s and edit it",
 				path, path, path)
 		}
-		return nil // config.toml exists, proceed
+		return nil
 	}
 	if !os.IsNotExist(err) {
 		return err
 	}
 
-	// config/ does not exist — generate default
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
@@ -238,8 +235,57 @@ func ensureConfig(path string) error {
 		return err
 	}
 
+	// Write overlay template files
+	templates := map[string]string{
+		"server.toml.default": `# Optional override for HTTP server settings. Remove .default suffix to enable.
+
+[server]
+debug = false
+listenerType = "tcp"
+listen = ":8080"
+readTimeout = 30
+writeTimeout = 30
+idleTimeout = 120
+writeBufferSize = 8192
+readBufferSize = 8192
+bodyLimit = 1048576
+trustedProxies = ["127.0.0.1", "::1"]
+`,
+		"bird.toml.default": `# Optional override for BIRD control and peer template settings. Remove .default suffix to enable.
+
+[bird]
+controlSocket = "/var/run/bird/bird.ctl"
+poolSize = 5
+poolSizeMax = 64
+connectionMaxRetries = 5
+connectionRetryDelayMs = 50
+bgpPeerConfDir = "/etc/bird/peers"
+bgpPeerConfTemplateFile = "./templates/peer.conf"
+ipCommandPath = "/usr/sbin/ip"
+`,
+		"sysctl.toml.default": `# Optional override for sysctl settings on new session interfaces. Remove .default suffix to enable.
+
+[sysctl]
+commandPath = "/usr/sbin/sysctl"
+ifaceIpForwarding = true
+ifaceIp6Forwarding = true
+ifaceIp6AcceptRa = false
+ifaceIp6AutoConfig = false
+ifaceRpFilter = 0
+ifaceAcceptLocal = true
+`,
+	}
+
+	for name, content := range templates {
+		tplPath := filepath.Join(dir, name)
+		if err := os.WriteFile(tplPath, []byte(content), 0644); err != nil {
+			return err
+		}
+	}
+
 	fmt.Printf("Default config written to %s.\n", defaultPath)
-	fmt.Printf("Copy it to %s, edit to match your node, then run again.\n", path)
+	fmt.Println("Overlay templates (server.toml.default, bird.toml.default, sysctl.toml.default) created.")
+	fmt.Printf("Copy %s.default to %s, edit to match your node, then run again.\n", path, path)
 	os.Exit(0)
 	return nil
 }
