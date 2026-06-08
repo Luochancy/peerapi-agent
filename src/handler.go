@@ -55,6 +55,8 @@ func initRouter(mux *http.ServeMux) http.Handler {
 	mux.HandleFunc("GET /lg/protocols/{name}", lgProtocols)
 	mux.HandleFunc("GET /lg/routes", lgRoutes)
 	mux.HandleFunc("GET /lg/routes/{prefix...}", lgRoutes)
+	mux.HandleFunc("GET /lg/ping", lgPing)
+	mux.HandleFunc("GET /lg/traceroute", lgTraceroute)
 
 	// Apply middleware in reverse order (last applied = first executed)
 	var handler http.Handler = mux
@@ -321,4 +323,50 @@ func lgRoutesForPrefix(w http.ResponseWriter, r *http.Request, prefix string) {
 		"routes": routes,
 		"total":  len(routes),
 	})
+}
+
+// lgPing handles GET /lg/ping?target=<ip>
+func lgPing(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", "GET")
+		sendJSONResponse(w, http.StatusMethodNotAllowed, "Method not allowed", nil)
+		return
+	}
+
+	target := r.URL.Query().Get("target")
+	if target == "" {
+		sendJSONResponse(w, http.StatusBadRequest, "Missing 'target' parameter", nil)
+		return
+	}
+
+	result, err := runPing(target)
+	if err != nil {
+		sendJSONResponse(w, http.StatusInternalServerError, fmt.Sprintf("Ping failed: %v", err), nil)
+		return
+	}
+
+	sendJSONResponse(w, 0, "OK", result)
+}
+
+// lgTraceroute handles GET /lg/traceroute?target=<ip>
+func lgTraceroute(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.Header().Set("Allow", "GET")
+		sendJSONResponse(w, http.StatusMethodNotAllowed, "Method not allowed", nil)
+		return
+	}
+
+	target := r.URL.Query().Get("target")
+	if target == "" {
+		sendJSONResponse(w, http.StatusBadRequest, "Missing 'target' parameter", nil)
+		return
+	}
+
+	result, err := runTraceroute(target)
+	if err != nil {
+		sendJSONResponse(w, http.StatusInternalServerError, fmt.Sprintf("Traceroute failed: %v", err), nil)
+		return
+	}
+
+	sendJSONResponse(w, 0, "OK", result)
 }
