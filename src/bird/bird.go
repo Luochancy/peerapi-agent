@@ -659,6 +659,7 @@ var (
 	connectDelayRe    = regexp.MustCompile(`Connect delay:\s+(\S+)`)
 	lastErrorRe       = regexp.MustCompile(`Last error:\s+(.+)`)
 	sessionRe         = regexp.MustCompile(`Session:\s+(.+)`)
+	hostnameRe        = regexp.MustCompile(`Hostname:\s+(.+)`)
 
 	// Channel-level detail field patterns
 	channelTableRe       = regexp.MustCompile(`Table:\s+(\S+)`)
@@ -667,6 +668,8 @@ var (
 	channelOutputFilterRe = regexp.MustCompile(`Output filter:\s+(.+)`)
 	channelImportLimitRe = regexp.MustCompile(`Import limit:\s+(\d+)`)
 	channelStateRe       = regexp.MustCompile(`State:\s+(\S+)`)
+	bgpNextHopRe         = regexp.MustCompile(`BGP Next hop:\s+(.+)`)
+	routeChangeLineRe    = regexp.MustCompile(`^\s*(Import|Export)\s+(updates|withdraws):\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)`)
 )
 
 // BGPState represents BGP-specific state information
@@ -682,6 +685,7 @@ type BGPState struct {
 	ConnectDelay    string `json:"connect_delay,omitempty"`
 	LastError       string `json:"last_error,omitempty"`
 	Session         string `json:"session,omitempty"`
+	Hostname        string `json:"hostname,omitempty"`
 }
 
 // ProtocolSummary represents a single protocol from "show protocols"
@@ -706,19 +710,48 @@ type ProtocolDetail struct {
 	BGP          *BGPState                  `json:"bgp,omitempty"`
 }
 
+// parseRCSNum parses a route change stat number, treating "---" as 0
+func parseRCSNum(s string) int64 {
+	s = strings.TrimSpace(s)
+	if s == "---" || s == "" {
+		return 0
+	}
+	n, _ := strconv.ParseInt(s, 10, 64)
+	return n
+}
+
+// RCSCounters holds the 5-column route change stat counters
+type RCSCounters struct {
+	Received int64 `json:"received,omitempty"`
+	Rejected int64 `json:"rejected,omitempty"`
+	Filtered int64 `json:"filtered,omitempty"`
+	Ignored  int64 `json:"ignored,omitempty"`
+	Accepted int64 `json:"accepted,omitempty"`
+}
+
+// RouteChangeStats holds per-direction route change counters for a channel
+type RouteChangeStats struct {
+	ImportUpdates   RCSCounters `json:"import_updates,omitempty"`
+	ImportWithdraws RCSCounters `json:"import_withdraws,omitempty"`
+	ExportUpdates   RCSCounters `json:"export_updates,omitempty"`
+	ExportWithdraws RCSCounters `json:"export_withdraws,omitempty"`
+}
+
 // ChannelInfo represents a BIRD channel (ipv4/ipv6)
 type ChannelInfo struct {
-	Name         string `json:"name"`
-	State        string `json:"state"`
-	Imported     int64  `json:"imported"`
-	Exported     int64  `json:"exported"`
-	Filtered     int64  `json:"filtered,omitempty"`
-	Preferred    int64  `json:"preferred,omitempty"`
-	Table        string `json:"table,omitempty"`
-	Preference   int64  `json:"preference,omitempty"`
-	InputFilter  string `json:"input_filter,omitempty"`
-	OutputFilter string `json:"output_filter,omitempty"`
-	ImportLimit  int64  `json:"import_limit,omitempty"`
+	Name             string            `json:"name"`
+	State            string            `json:"state"`
+	Imported         int64             `json:"imported"`
+	Exported         int64             `json:"exported"`
+	Filtered         int64             `json:"filtered,omitempty"`
+	Preferred        int64             `json:"preferred,omitempty"`
+	Table            string            `json:"table,omitempty"`
+	Preference       int64             `json:"preference,omitempty"`
+	InputFilter      string            `json:"input_filter,omitempty"`
+	OutputFilter     string            `json:"output_filter,omitempty"`
+	ImportLimit      int64             `json:"import_limit,omitempty"`
+	RouteChangeStats *RouteChangeStats `json:"route_change_stats,omitempty"`
+	BGPNextHop       string            `json:"bgp_next_hop,omitempty"`
 }
 
 // RouteEntry represents a single routing table entry
@@ -894,6 +927,38 @@ func ParseProtocolDetail(raw string) *ProtocolDetail {
 				}
 				continue
 			}
+			// BGP Next hop (per channel)
+			if m := bgpNextHopRe.FindStringSubmatch(line); len(m) > 1 {
+				currentChannel.BGPNextHop = m[1]
+				continue
+			}
+			// Route change stats line: "Import updates: N N N N N" etc
+			if m := routeChangeLineRe.FindStringSubmatch(line); len(m) > 2 {
+				if currentChannel.RouteChangeStats == nil {
+					currentChannel.RouteChangeStats = &RouteChangeStats{}
+				}
+				rcs := currentChannel.RouteChangeStats
+				counters := RCSCounters{
+					Received: parseRCSNum(m[3]),
+					Rejected: parseRCSNum(m[4]),
+					Filtered: parseRCSNum(m[5]),
+					Ignored:  parseRCSNum(m[6]),
+					Accepted: parseRCSNum(m[7]),
+				}
+				direction := m[1]   // Import or Export
+				action := m[2]      // updates or withdraws
+				switch {
+				case direction == "Import" && action == "updates":
+					rcs.ImportUpdates = counters
+				case direction == "Import" && action == "withdraws":
+					rcs.ImportWithdraws = counters
+				case direction == "Export" && action == "updates":
+					rcs.ExportUpdates = counters
+				case direction == "Export" && action == "withdraws":
+					rcs.ExportWithdraws = counters
+				}
+				continue
+			}
 			// Filter count (if present): "  N filtered"
 			if strings.Contains(line, "filtered") && currentChannel != nil {
 				filterRe := regexp.MustCompile(`(\d+)\s+filtered`)
@@ -947,6 +1012,10 @@ func ParseProtocolDetail(raw string) *ProtocolDetail {
 		}
 		if m := sessionRe.FindStringSubmatch(line); len(m) > 1 {
 			bgp.Session = m[1]; hasBgpData = true
+			continue
+		}
+		if m := hostnameRe.FindStringSubmatch(line); len(m) > 1 {
+			bgp.Hostname = m[1]; hasBgpData = true
 			continue
 		}
 	}
