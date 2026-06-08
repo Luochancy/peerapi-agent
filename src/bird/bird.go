@@ -619,7 +619,7 @@ func parseProtocolOutput(data []byte) (string, string, string, int64, int64, int
 
 // Pre-compiled regex patterns for better performance
 var (
-	routeLineRegex = regexp.MustCompile(`^Routes:\s+(\d+)\s+imported,(?:\s+\d+\s+filtered,)?\s+(\d+)\s+exported`)
+	routeLineRegex = regexp.MustCompile(`^Routes:\s+(\d+)\s+imported,(?:\s+\d+\s+filtered,)?\s+(\d+)\s+exported(?:,\s+(\d+)\s+preferred)?`)
 	channelRegex   = regexp.MustCompile(`^Channel\s+(ipv[46])$`)
 	stateDownRegex = regexp.MustCompile(`^State:.*DOWN`)
 
@@ -646,7 +646,43 @@ var (
 	routeSinceRe  = regexp.MustCompile(`(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})`)
 	routeFromRe   = regexp.MustCompile(`from\s+(\S+)`)
 	routeMetricRe = regexp.MustCompile(`metric\s+(\d+)`)
+
+	// BGP-level detail field patterns
+	bgpStateRe        = regexp.MustCompile(`BGP state:\s+(\S+)`)
+	neighborAddrRe    = regexp.MustCompile(`Neighbor address:\s+(\S+)`)
+	neighborASRe      = regexp.MustCompile(`Neighbor AS:\s+(\d+)`)
+	localASRe         = regexp.MustCompile(`Local AS:\s+(\d+)`)
+	neighborIDRe      = regexp.MustCompile(`Neighbor ID:\s+(\S+)`)
+	sourceAddrRe      = regexp.MustCompile(`Source address:\s+(\S+)`)
+	holdTimerRe       = regexp.MustCompile(`Hold timer:\s+(\S+)`)
+	keepaliveTimerRe  = regexp.MustCompile(`Keepalive timer:\s+(\S+)`)
+	connectDelayRe    = regexp.MustCompile(`Connect delay:\s+(\S+)`)
+	lastErrorRe       = regexp.MustCompile(`Last error:\s+(.+)`)
+	sessionRe         = regexp.MustCompile(`Session:\s+(.+)`)
+
+	// Channel-level detail field patterns
+	channelTableRe       = regexp.MustCompile(`Table:\s+(\S+)`)
+	channelPreferenceRe  = regexp.MustCompile(`Preference:\s+(\d+)`)
+	channelInputFilterRe = regexp.MustCompile(`Input filter:\s+(.+)`)
+	channelOutputFilterRe = regexp.MustCompile(`Output filter:\s+(.+)`)
+	channelImportLimitRe = regexp.MustCompile(`Import limit:\s+(\d+)`)
+	channelStateRe       = regexp.MustCompile(`State:\s+(\S+)`)
 )
+
+// BGPState represents BGP-specific state information
+type BGPState struct {
+	State           string `json:"state,omitempty"`
+	NeighborAddress string `json:"neighbor_address,omitempty"`
+	NeighborAS      int64  `json:"neighbor_as,omitempty"`
+	LocalAS         int64  `json:"local_as,omitempty"`
+	NeighborID      string `json:"neighbor_id,omitempty"`
+	SourceAddress   string `json:"source_address,omitempty"`
+	HoldTimer       string `json:"hold_timer,omitempty"`
+	KeepaliveTimer  string `json:"keepalive_timer,omitempty"`
+	ConnectDelay    string `json:"connect_delay,omitempty"`
+	LastError       string `json:"last_error,omitempty"`
+	Session         string `json:"session,omitempty"`
+}
 
 // ProtocolSummary represents a single protocol from "show protocols"
 type ProtocolSummary struct {
@@ -667,15 +703,22 @@ type ProtocolDetail struct {
 	Since        string                     `json:"since"`
 	Info         string                     `json:"info,omitempty"`
 	Channels     []ChannelInfo              `json:"channels"`
+	BGP          *BGPState                  `json:"bgp,omitempty"`
 }
 
 // ChannelInfo represents a BIRD channel (ipv4/ipv6)
 type ChannelInfo struct {
-	Name     string `json:"name"`
-	State    string `json:"state"`
-	Imported int64  `json:"imported"`
-	Exported int64  `json:"exported"`
-	Filtered int64  `json:"filtered,omitempty"`
+	Name         string `json:"name"`
+	State        string `json:"state"`
+	Imported     int64  `json:"imported"`
+	Exported     int64  `json:"exported"`
+	Filtered     int64  `json:"filtered,omitempty"`
+	Preferred    int64  `json:"preferred,omitempty"`
+	Table        string `json:"table,omitempty"`
+	Preference   int64  `json:"preference,omitempty"`
+	InputFilter  string `json:"input_filter,omitempty"`
+	OutputFilter string `json:"output_filter,omitempty"`
+	ImportLimit  int64  `json:"import_limit,omitempty"`
 }
 
 // RouteEntry represents a single routing table entry
@@ -788,8 +831,11 @@ func ParseProtocolDetail(raw string) *ProtocolDetail {
 		}
 	}
 
-	// Parse channels and route counts
+	// Parse BGP-level fields and channels
 	var currentChannel *ChannelInfo
+	bgp := &BGPState{}
+	hasBgpData := false
+
 	for _, line := range lines[2:] {
 		line = strings.TrimSpace(line)
 		if line == "" {
@@ -808,34 +854,109 @@ func ParseProtocolDetail(raw string) *ProtocolDetail {
 			continue
 		}
 
-		if currentChannel == nil {
-			continue
-		}
-
-		// State: DOWN
-		if stateDownRegex.MatchString(line) {
-			currentChannel.State = "down"
-			continue
-		}
-
-		// Routes: N imported, M filtered, K exported
-		if m := routeLineRegex.FindStringSubmatch(line); len(m) > 2 {
-			currentChannel.Imported, _ = strconv.ParseInt(m[1], 10, 64)
-			currentChannel.Exported, _ = strconv.ParseInt(m[2], 10, 64)
-			continue
-		}
-
-		// Filter count (if present): "  N filtered"
-		if strings.Contains(line, "filtered") && currentChannel != nil {
-			filterRe := regexp.MustCompile(`(\d+)\s+filtered`)
-			if fm := filterRe.FindStringSubmatch(line); len(fm) > 1 {
-				currentChannel.Filtered, _ = strconv.ParseInt(fm[1], 10, 64)
+		if currentChannel != nil {
+			// Channel State: UP / DOWN
+			if m := channelStateRe.FindStringSubmatch(line); len(m) > 1 {
+				currentChannel.State = strings.ToLower(m[1])
+				continue
 			}
+			// Channel Table
+			if m := channelTableRe.FindStringSubmatch(line); len(m) > 1 {
+				currentChannel.Table = m[1]
+				continue
+			}
+			// Channel Preference
+			if m := channelPreferenceRe.FindStringSubmatch(line); len(m) > 1 {
+				currentChannel.Preference, _ = strconv.ParseInt(m[1], 10, 64)
+				continue
+			}
+			// Channel Input filter
+			if m := channelInputFilterRe.FindStringSubmatch(line); len(m) > 1 {
+				currentChannel.InputFilter = m[1]
+				continue
+			}
+			// Channel Output filter
+			if m := channelOutputFilterRe.FindStringSubmatch(line); len(m) > 1 {
+				currentChannel.OutputFilter = m[1]
+				continue
+			}
+			// Channel Import limit
+			if m := channelImportLimitRe.FindStringSubmatch(line); len(m) > 1 {
+				currentChannel.ImportLimit, _ = strconv.ParseInt(m[1], 10, 64)
+				continue
+			}
+			// Routes: N imported, M exported, K preferred
+			if m := routeLineRegex.FindStringSubmatch(line); len(m) > 2 {
+				currentChannel.Imported, _ = strconv.ParseInt(m[1], 10, 64)
+				currentChannel.Exported, _ = strconv.ParseInt(m[2], 10, 64)
+				if len(m) > 3 && m[3] != "" {
+					currentChannel.Preferred, _ = strconv.ParseInt(m[3], 10, 64)
+				}
+				continue
+			}
+			// Filter count (if present): "  N filtered"
+			if strings.Contains(line, "filtered") && currentChannel != nil {
+				filterRe := regexp.MustCompile(`(\d+)\s+filtered`)
+				if fm := filterRe.FindStringSubmatch(line); len(fm) > 1 {
+					currentChannel.Filtered, _ = strconv.ParseInt(fm[1], 10, 64)
+				}
+			}
+			continue
+		}
+
+		// BGP-level fields (before any channel section)
+		if m := bgpStateRe.FindStringSubmatch(line); len(m) > 1 {
+			bgp.State = m[1]; hasBgpData = true
+			continue
+		}
+		if m := neighborAddrRe.FindStringSubmatch(line); len(m) > 1 {
+			bgp.NeighborAddress = m[1]; hasBgpData = true
+			continue
+		}
+		if m := neighborASRe.FindStringSubmatch(line); len(m) > 1 {
+			bgp.NeighborAS, _ = strconv.ParseInt(m[1], 10, 64); hasBgpData = true
+			continue
+		}
+		if m := localASRe.FindStringSubmatch(line); len(m) > 1 {
+			bgp.LocalAS, _ = strconv.ParseInt(m[1], 10, 64); hasBgpData = true
+			continue
+		}
+		if m := neighborIDRe.FindStringSubmatch(line); len(m) > 1 {
+			bgp.NeighborID = m[1]; hasBgpData = true
+			continue
+		}
+		if m := sourceAddrRe.FindStringSubmatch(line); len(m) > 1 {
+			bgp.SourceAddress = m[1]; hasBgpData = true
+			continue
+		}
+		if m := holdTimerRe.FindStringSubmatch(line); len(m) > 1 {
+			bgp.HoldTimer = m[1]; hasBgpData = true
+			continue
+		}
+		if m := keepaliveTimerRe.FindStringSubmatch(line); len(m) > 1 {
+			bgp.KeepaliveTimer = m[1]; hasBgpData = true
+			continue
+		}
+		if m := connectDelayRe.FindStringSubmatch(line); len(m) > 1 {
+			bgp.ConnectDelay = m[1]; hasBgpData = true
+			continue
+		}
+		if m := lastErrorRe.FindStringSubmatch(line); len(m) > 1 {
+			bgp.LastError = m[1]; hasBgpData = true
+			continue
+		}
+		if m := sessionRe.FindStringSubmatch(line); len(m) > 1 {
+			bgp.Session = m[1]; hasBgpData = true
+			continue
 		}
 	}
 
 	if currentChannel != nil {
 		detail.Channels = append(detail.Channels, *currentChannel)
+	}
+
+	if hasBgpData {
+		detail.BGP = bgp
 	}
 
 	return detail
