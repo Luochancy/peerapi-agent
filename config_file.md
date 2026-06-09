@@ -7,7 +7,7 @@
 // See LICENSE in the project root.
 // *******************************************************************
 
-# peerapi-agent 配置文件解析
+# PeerHub Agent 配置文件解析
 
 本文基于仓库根目录的 [config.json](config.json) 进行逐项说明。字段结构与代码定义一致，详见 [src/config.go](src/config.go)。
 
@@ -15,7 +15,7 @@
 - `server`: HTTP 服务与监听配置
 - `ipConfig`: 本机用于接口地址分配的 IP 池（用于接口本端地址）
 - `logger`: 日志输出与滚动
-- `peerApiCenter`: PeerAPI 中心服务与会话同步配置
+- `peerApiCenter`: PeerHub API 中心服务与会话同步配置
 - `bird`: BIRD 控制与模板生成配置
 - `sysctl`: 绑定接口的 sysctl 参数
 - `metric`: RTT/性能采集与 GeoIP 规则
@@ -51,7 +51,7 @@
 - `consoleLogging`: 是否同时输出到控制台。
 
 ## peerApiCenter
-- `apiUrl`: PeerAPI 中心服务地址。
+- `apiUrl`: PeerHub API 中心服务地址。
 - `probeServerIPv4`: 探测服务 IPv4。
 - `probeServerIPv6`: 探测服务 IPv6。
 - `probeServerIPv6Prefix`: 探测服务 IPv6 前缀（用于路由注入）。

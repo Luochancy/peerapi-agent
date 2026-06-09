@@ -11,11 +11,11 @@
 // See the LICENSE file in the project root for details.
 // *******************************************************************
 
-# iEdon PeerAPI Agent
+# LuocyNet PeerHub Agent
 
 [![Go Version](https://img.shields.io/badge/Go-1.25%2B-blue.svg)](https://golang.org)
 
-A comprehensive Go application for automated BGP peering session management on `iEdon-Net` infrastructure nodes. This agent communicates with a central PeerAPI server to orchestrate BGP session lifecycle, interface configuration, network monitoring, and real-time performance metrics collection.
+A comprehensive Go application for automated BGP peering session management on `LuocyNet` infrastructure nodes. This agent communicates with a central PeerHub server to orchestrate BGP session lifecycle, interface configuration, network monitoring, and real-time performance metrics collection.
 
 ## Features
 
@@ -23,7 +23,7 @@ A comprehensive Go application for automated BGP peering session management on `
 - **Automated Session Lifecycle**: Complete setup, configuration, monitoring, and teardown of BGP peering sessions
 - **Multi-Protocol Support**: Traditional BGP and MP-BGP with IPv4/IPv6 route filtering
 - **Dynamic Interface Management**: Automated WireGuard and GRE tunnel configuration with IP addressing
-- **Status Synchronization**: Real-time session state sync with central PeerAPI server
+- **Status Synchronization**: Real-time session state sync with central PeerHub server
 - **JWT Session Authentication**: Secure session passthrough with JWT token validation
 
 ### Advanced BIRD Integration
@@ -67,15 +67,15 @@ A comprehensive Go application for automated BGP peering session management on `
 1. Download the latest release:
 
 ```bash
-curl -L -o peerapi-agent https://github.com/iedon/peerapi-agent/releases/latest/download/peerapi-agent-linux-amd64
-chmod +x peerapi-agent
+curl -L -o peerhub-agent https://github.com/Luochancy/peerhub-agent/releases/latest/download/peerhub-agent-linux-amd64
+chmod +x peerhub-agent
 ```
 
 2. Create configuration directory and download GeoIP database (optional):
 
 ```bash
-mkdir -p /data/peerapi-agent/logs
-wget -O /data/peerapi-agent/GeoLite2-Country.mmdb <Your mmdb file source>
+mkdir -p /data/peerhub-agent/logs
+wget -O /data/peerhub-agent/GeoLite2-Country.mmdb <Your mmdb file source>
 ```
 
 3. Create a configuration file (see Configuration section below)
@@ -83,16 +83,16 @@ wget -O /data/peerapi-agent/GeoLite2-Country.mmdb <Your mmdb file source>
 4. Run the agent:
 
 ```bash
-./peerapi-agent -c config.json
+./peerhub-agent -c config.json
 ```
 
 ### Building from Source
 
 ```bash
-git clone https://github.com/iedon/peerapi-agent.git
-cd peerapi-agent/src
+git clone https://github.com/Luochancy/peerhub-agent.git
+cd peerhub-agent/src
 go get
-go build -o peerapi-agent" .
+go build -o peerhub-agent" .
 ```
 
 ### Running as a System Service
@@ -102,25 +102,25 @@ A systemd service file is included in the repository:
 1. Install the binary and configuration:
 
 ```bash
-mkdir -p /data/peerapi-agent
-cp peerapi-agent /data/peerapi-agent/
-cp config.json /data/peerapi-agent/
+mkdir -p /data/peerhub-agent
+cp peerhub-agent /data/peerhub-agent/
+cp config.json /data/peerhub-agent/
 ```
 
 2. Install and enable the systemd service:
 
 ```bash
-cp peerapi-agent.service /etc/systemd/system/
+cp peerhub-agent.service /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable peerapi-agent
-systemctl start peerapi-agent
+systemctl enable peerhub-agent
+systemctl start peerhub-agent
 ```
 
 3. Monitor service status:
 
 ```bash
-systemctl status peerapi-agent
-journalctl -u peerapi-agent -f
+systemctl status peerhub-agent
+journalctl -u peerhub-agent -f
 ```
 
 ## Usage
@@ -128,7 +128,7 @@ journalctl -u peerapi-agent -f
 ### Command Line Options
 
 ```bash
-Usage: ./peerapi-agent [-c config_file] [-h]
+Usage: ./peerhub-agent [-c config_file] [-h]
   -c string
         Path to the JSON configuration file (default "config.json")
   -h    Print help message and exit
@@ -148,7 +148,7 @@ All endpoints require JWT authentication using the configured `agentSecret`.
 
 The agent runs **6 concurrent background tasks**:
 
-1. **Heartbeat Task** (`heartbeatTask`) - Sends periodic health reports to PeerAPI server
+1. **Heartbeat Task** (`heartbeatTask`) - Sends periodic health reports to PeerHub server
 2. **Session Sync Task** (`mainSessionTask`) - Synchronizes BGP session configurations
 3. **Metric Collection Task** (`metricTask`) - Collects and reports performance metrics
 4. **Bandwidth Monitor Task** (`bandwidthMonitorTask`) - Monitors interface traffic rates
@@ -157,7 +157,7 @@ The agent runs **6 concurrent background tasks**:
 
 ## Graceful Shutdown
 
-The peerapi-agent implements comprehensive graceful shutdown handling to ensure data consistency and resource cleanup:
+The peerhub-agent implements comprehensive graceful shutdown handling to ensure data consistency and resource cleanup:
 
 ### Shutdown Process
 
@@ -202,7 +202,7 @@ The agent is configured through a JSON file with the following structure. All co
   },
 
   "logger": {
-    "file": "./logs/peerapi-agent.log",
+    "file": "./logs/peerhub-agent.log",
     "maxSize": 10,
     "maxBackups": 10,
     "maxAge": 30,
@@ -252,7 +252,7 @@ The agent is configured through a JSON file with the following structure. All co
     "privateKeyPath": "/etc/wireguard/privatekey",
     "publicKeyPath": "/etc/wireguard/publickey",
     "persistentKeepaliveInterval": 25,
-    "localEndpointHost": "jp-118.dn42.iedon.net",
+    "localEndpointHost": "jp-118.dn42.luocynet.com",
     "dn42BandwidthCommunity": 24,
     "dn42InterfaceSecurityCommunity": 34
   },
@@ -290,7 +290,7 @@ HTTP server settings for the agent's API endpoints. The server supports both TCP
 
 **Listener Types:**
 - **TCP**: Standard network listener for external access (e.g., `:8080`, `127.0.0.1:8080`)
-- **Unix Socket**: Local domain socket for same-machine communication (e.g., `/tmp/peerapi-agent.sock`, `/var/run/peerapi-agent.sock`)
+- **Unix Socket**: Local domain socket for same-machine communication (e.g., `/tmp/peerhub-agent.sock`, `/var/run/peerhub-agent.sock`)
 
 **Examples:**
 ```json
@@ -306,7 +306,7 @@ HTTP server settings for the agent's API endpoints. The server supports both TCP
 {
   "server": {
     "listenerType": "unix", 
-    "listen": "/tmp/peerapi-agent.sock"
+    "listen": "/tmp/peerhub-agent.sock"
   }
 }
 ```
@@ -317,23 +317,23 @@ Structured logging configuration with file rotation support.
 
 | Parameter | Type | Description | Default |
 |-----------|------|-------------|---------|
-| `file` | string | Log file path | `"./logs/peerapi-agent.log"` |
+| `file` | string | Log file path | `"./logs/peerhub-agent.log"` |
 | `maxSize` | integer | Maximum log file size in MB before rotation | `10` |
 | `maxBackups` | integer | Maximum number of rotated log files to retain | `10` |
 | `maxAge` | integer | Maximum days to keep old log files | `30` |
 | `compress` | boolean | Compress rotated log files with gzip | `true` |
 | `consoleLogging` | boolean | Enable console output in addition to file logging | `true` |
 
-#### PeerAPI Center Configuration (`peerApiCenter`)
+#### PeerHub API Center Configuration (`peerApiCenter`)
 
 Central server communication and authentication settings.
 
 | Parameter | Type | Description | Required |
 |-----------|------|-------------|----------|
-| `url` | string | Base URL of the central PeerAPI server | Yes |
-| `secret` | string | Shared secret for PeerAPI server authentication | Yes |
+| `url` | string | Base URL of the central PeerHub server | Yes |
+| `secret` | string | Shared secret for PeerHub server authentication | Yes |
 | `requestTimeout` | integer | HTTP request timeout in seconds | Yes |
-| `routerUuid` | string | UUID identifier for this router in PeerAPI system | Yes |
+| `routerUuid` | string | UUID identifier for this router in PeerHub system | Yes |
 | `agentSecret` | string | Secret key for JWT authentication of API requests | Yes |
 | `heartbeatInterval` | integer | Heartbeat report interval in seconds | Yes |
 | `syncInterval` | integer | BGP session sync interval in seconds | Yes |
@@ -403,13 +403,13 @@ GRE tunnel interface settings.
 
 ## Architecture
 
-The peerapi-agent is built with a modern concurrent architecture featuring **6 independent background tasks** that communicate through thread-safe shared data structures:
+The peerhub-agent is built with a modern concurrent architecture featuring **6 independent background tasks** that communicate through thread-safe shared data structures:
 
 ### Background Task System
 
 | Task | Function | Interval | Purpose |
 |------|----------|----------|---------|
-| **Heartbeat Task** | `heartbeatTask()` | 30s (configurable) | Reports node health, system metrics, and uptime to PeerAPI server |
+| **Heartbeat Task** | `heartbeatTask()` | 30s (configurable) | Reports node health, system metrics, and uptime to PeerHub server |
 | **Session Sync Task** | `mainSessionTask()` | 300s (configurable) | Synchronizes BGP session configurations and status with central server |
 | **Metric Collection Task** | `metricTask()` | 60s (configurable) | Collects BGP statistics, RTT measurements, and interface metrics |
 | **Bandwidth Monitor Task** | `bandwidthMonitorTask()` | 1s (fixed) | Real-time monitoring of interface traffic rates and bandwidth usage |
@@ -437,7 +437,7 @@ var rttTrackers = make(map[string]*RTTTracker)      // rttMutex (RWMutex)
 
 ### Session Lifecycle Management
 
-1. **Discovery**: Sessions fetched from central PeerAPI server
+1. **Discovery**: Sessions fetched from central PeerHub server
 2. **Configuration**: Automatic interface creation (WireGuard/GRE) and IP addressing
 3. **BIRD Setup**: Dynamic BGP configuration generation and deployment
 4. **Monitoring**: Continuous RTT measurement and performance tracking
@@ -456,7 +456,7 @@ var rttTrackers = make(map[string]*RTTTracker)      // rttMutex (RWMutex)
 ### Project Structure
 
 ```
-peerapi-agent/
+peerhub-agent/
 ├── src/                          # Go source code
 │   ├── main.go                   # Application entry point and lifecycle management
 │   ├── config.go                 # Configuration loading and validation
@@ -467,7 +467,7 @@ peerapi-agent/
 │   ├── logger.go                 # Structured logging with rotation support
 │   ├── session.go                # BGP session management and interface configuration
 │   ├── task_monitoring.go        # Heartbeat and bandwidth monitoring tasks
-│   ├── task_session_sync.go      # BGP session synchronization with PeerAPI server
+│   ├── task_session_sync.go      # BGP session synchronization with PeerHub server
 │   ├── task_metric.go            # Performance metrics collection and reporting
 │   ├── task_dn42_bgp_community.go # DN42 BGP community management
 │   ├── task_geoip.go            # Geographic validation and filtering
@@ -479,10 +479,10 @@ peerapi-agent/
 ├── templates/                    # Configuration templates
 │   └── bird_peer.conf           # BIRD BGP peer configuration template
 ├── config.json                  # Main configuration file
-├── peerapi-agent.service        # Systemd service definition
+├── peerhub-agent.service        # Systemd service definition
 ├── GeoLite2-Country.mmdb        # MaxMind GeoIP database (optional)
 └── logs/                        # Log file directory
-    └── peerapi-agent.log        # Application logs with rotation
+    └── peerhub-agent.log        # Application logs with rotation
 ```
 
 ### Key Components
@@ -523,7 +523,7 @@ peerapi-agent/
 ```bash
 #!/bin/sh
 set -e
-echo "Building peerapi-agent for Linux AMD64..."
+echo "Building peerhub-agent for Linux AMD64..."
 
 export GOOS=linux
 export GOARCH=amd64
@@ -533,7 +533,7 @@ mkdir dist
 
 cd src
 go mod tidy
-go build -o ../dist/peerapi-agent -ldflags="-X main.GIT_COMMIT=$(git rev-parse --short HEAD)"
+go build -o ../dist/peerhub-agent -ldflags="-X main.GIT_COMMIT=$(git rev-parse --short HEAD)"
 
 cd ..
 cp config.json ./dist/config.json
@@ -578,7 +578,7 @@ echo "Build completed."
 
 #### Required Services
 - **MaxMind GeoLite2** - Geographic IP database for session validation
-- **PeerAPI Center** - Central coordination server for BGP session management
+- **PeerHub API Center** - Central coordination server for BGP session management
 - **BIRD Control Socket** - Unix socket communication with BIRD daemon
 
 #### System Requirements
