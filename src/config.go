@@ -55,15 +55,15 @@ type peerApiCenterConfig struct {
 }
 
 type birdConfig struct {
-	ControlSocket           string             `toml:"controlSocket"`
-	PoolSize                int                `toml:"poolSize"`
-	PoolSizeMax             int                `toml:"poolSizeMax"`
-	ConnectionMaxRetries    int                `toml:"connectionMaxRetries"`
-	ConnectionRetryDelayMs  int                `toml:"connectionRetryDelayMs"`
-	BGPPeerConfDir          string             `toml:"bgpPeerConfDir"`
-	BGPPeerConfTemplateFile string             `toml:"bgpPeerConfTemplateFile"`
-	BGPPeerConfTemplate     *template.Template `toml:"-"`
-	IPCommandPath           string             `toml:"ipCommandPath"`
+	ControlSocket              string             `toml:"controlSocket"`
+	PoolSize                   int                `toml:"poolSize"`
+	PoolSizeMax                int                `toml:"poolSizeMax"`
+	ConnectionMaxRetries       int                `toml:"connectionMaxRetries"`
+	ConnectionRetryDelayMs     int                `toml:"connectionRetryDelayMs"`
+	BGPPeerConfDir             string             `toml:"bgpPeerConfDir"`
+	BGPPeerConfTemplateContent string             `toml:"bgpPeerConfTemplate"`
+	BGPPeerConfTemplate        *template.Template `toml:"-"`
+	IPCommandPath              string             `toml:"ipCommandPath"`
 }
 
 type wireGuardConfig struct {
@@ -170,7 +170,6 @@ func loadConfig(filename string) (*config, error) {
 		dest interface{}
 	}{
 		{"server.toml", &cfg.Server},
-		{"bird.toml", &cfg.Bird},
 		{"sysctl.toml", &cfg.Sysctl},
 	}
 
@@ -187,8 +186,6 @@ func loadConfig(filename string) (*config, error) {
 		switch d := ov.dest.(type) {
 		case *serverConfig:
 			*d = wrapper.Server
-		case *birdConfig:
-			*d = wrapper.Bird
 		case *sysctlConfig:
 			*d = wrapper.Sysctl
 		}
@@ -210,7 +207,14 @@ func loadConfig(filename string) (*config, error) {
 		cfg.WireGuard.PublicKey = string(key)
 	}
 
-	if cfg.Bird.BGPPeerConfTemplateFile != "" {
+	// Parse BIRD peer template — prefer inline content, fall back to file
+	if cfg.Bird.BGPPeerConfTemplateContent != "" {
+		tmpl, err := template.New("bird_peer").Parse(cfg.Bird.BGPPeerConfTemplateContent)
+		if err != nil {
+			return cfg, err
+		}
+		cfg.Bird.BGPPeerConfTemplate = tmpl
+	} else if cfg.Bird.BGPPeerConfTemplateFile != "" {
 		tmpl, err := template.ParseFiles(cfg.Bird.BGPPeerConfTemplateFile)
 		if err != nil {
 			return cfg, err
@@ -271,18 +275,6 @@ readBufferSize = 8192
 bodyLimit = 1048576
 trustedProxies = ["127.0.0.1", "::1"]
 `,
-		"bird.toml.default": `# Optional override for BIRD control and peer template settings. Remove .default suffix to enable.
-
-[bird]
-controlSocket = "/var/run/bird/bird.ctl"
-poolSize = 5
-poolSizeMax = 64
-connectionMaxRetries = 5
-connectionRetryDelayMs = 50
-bgpPeerConfDir = "/etc/bird/peers"
-bgpPeerConfTemplateFile = "./templates/peer.conf"
-ipCommandPath = "/usr/sbin/ip"
-`,
 		"sysctl.toml.default": `# Optional override for sysctl settings on new session interfaces. Remove .default suffix to enable.
 
 [sysctl]
@@ -303,38 +295,8 @@ ifaceAcceptLocal = true
 		}
 	}
 
-	// Write BIRD peer config template
-	templatesDir := "templates"
-	if err := os.MkdirAll(templatesDir, 0755); err != nil {
-		return err
-	}
-	peerConf := `###########################################
-##                WARNING                ##
-###########################################
-#                                         #
-#  This file is managed by iEdon PeerAPI. #
-#                                         #
-#  DO NOT EDIT OR DELETE THIS FILE IF YOU #
-#  ARE NOT SURE.                          #
-###########################################
-
-protocol bgp {{ .SessionName }} from dnpeers {
-    neighbor {{ .InterfaceAddr }} as {{ .ASN }};
-    {{- if .SourceAddress }}
-    source address {{ .SourceAddress }};
-    {{- end }}
-    {{- if .ExtendedNextHopOn }}
-    ipv4 { extended next hop on; };
-    {{- end }};
-}
-`
-	if err := os.WriteFile(filepath.Join(templatesDir, "peer.conf"), []byte(peerConf), 0644); err != nil {
-		return err
-	}
-
 	fmt.Printf("Default config written to %s.\n", defaultPath)
-	fmt.Println("Overlay templates (server.toml.default, bird.toml.default, sysctl.toml.default) created.")
-	fmt.Println("BIRD peer config template written to templates/peer.conf.")
+	fmt.Println("Overlay templates (server.toml.default, sysctl.toml.default) created.")
 	fmt.Printf("Copy %s.default to %s, edit to match your node, then run again.\n", path, path)
 	os.Exit(0)
 	return nil
@@ -366,6 +328,26 @@ wanInterfaces = ["eth0"]
 sessionPassthroughJwtSecert = ""
 interfaceIpAllowPublic = false
 interfaceIpBlacklist = ["192.168.0.0/16","10.0.0.0/8","172.16.0.0/16","172.17.0.0/16","172.18.0.0/16","172.19.0.0/16","172.24.0.0/16","172.25.0.0/16","172.26.0.0/16","172.27.0.0/16","172.28.0.0/16","172.29.0.0/16","172.30.0.0/16","172.31.0.0/16","127.0.0.0/8","224.0.0.0/4","::1/128","ff00::/8"]
+
+[bird]
+controlSocket = "/var/run/bird/bird.ctl"
+poolSize = 5
+poolSizeMax = 64
+connectionMaxRetries = 5
+connectionRetryDelayMs = 50
+bgpPeerConfDir = "/etc/bird/peers"
+bgpPeerConfTemplate = """
+protocol bgp {{ .SessionName }} from dnpeers {
+    neighbor {{ .InterfaceAddr }} as {{ .ASN }};
+    {{- if .SourceAddress }}
+    source address {{ .SourceAddress }};
+    {{- end }}
+    {{- if .ExtendedNextHopOn }}
+    ipv4 { extended next hop on; };
+    {{- end }};
+}
+"""
+ipCommandPath = "/usr/sbin/ip"
 
 [wireguard]
 wgCommandPath = "/usr/bin/wg"
