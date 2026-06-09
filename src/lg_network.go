@@ -1,3 +1,12 @@
+// *******************************************************************
+// src/lg_network.go
+//
+// Copyright (C) 2026 Luochancy
+//
+// Licensed under the GNU General Public License v3.0.
+// See LICENSE in the project root.
+// *******************************************************************
+
 package main
 
 import (

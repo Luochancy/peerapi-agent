@@ -1,3 +1,12 @@
+// *******************************************************************
+// config_file.md
+//
+// Copyright (C) 2026 Luochancy
+//
+// Licensed under the GNU General Public License v3.0.
+// See LICENSE in the project root.
+// *******************************************************************
+
 # peerapi-agent 配置文件解析
 
 本文基于仓库根目录的 [config.json](config.json) 进行逐项说明。字段结构与代码定义一致，详见 [src/config.go](src/config.go)。

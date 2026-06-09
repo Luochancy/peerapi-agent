@@ -1,3 +1,12 @@
+// *******************************************************************
+// DEPLOY.md
+//
+// Copyright (C) 2026 Luochancy
+//
+// Licensed under the GNU General Public License v3.0.
+// See LICENSE in the project root.
+// *******************************************************************
+
 # PeerAPI Agent 部署指南
 
 ## 架构概览
