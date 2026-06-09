@@ -644,7 +644,7 @@ var (
 	routeViaRe    = regexp.MustCompile(`via\s+(\S+)\s+on\s+(\S+)`)
 	routeProtoRe  = regexp.MustCompile(`\((\w+)(?:/(\w+))?\)`)
 	routeSinceRe  = regexp.MustCompile(`(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})`)
-	routeFromRe   = regexp.MustCompile(`from\s+(\S+)`)
+	routeFromRe   = regexp.MustCompile(`from\s+([^\s\]]+)`)
 	routeMetricRe = regexp.MustCompile(`metric\s+(\d+)`)
 
 	// BGP-level detail field patterns
