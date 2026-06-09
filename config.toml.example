@@ -1,0 +1,75 @@
+[ipConfig]
+ipv4 = ""
+ipv6 = ""
+ipv6LinkLocal = ""
+
+[peerApiCenter]
+apiUrl = "http://127.0.0.1:13000"
+secret = ""
+routerUuid = ""
+agentSecret = ""
+requestTimeout = 15
+probeServerIPv4 = ""
+probeServerIPv6 = ""
+probeServerIPv6Prefix = ""
+probeServerPort = 2189
+heartbeatInterval = 30
+syncInterval = 300
+metricInterval = 60
+wanInterfaces = ["eth0"]
+sessionPassthroughJwtSecert = ""
+interfaceIpAllowPublic = false
+interfaceIpBlacklist = ["192.168.0.0/16","10.0.0.0/8","172.16.0.0/16","172.17.0.0/16","172.18.0.0/16","172.19.0.0/16","172.24.0.0/16","172.25.0.0/16","172.26.0.0/16","172.27.0.0/16","172.28.0.0/16","172.29.0.0/16","172.30.0.0/16","172.31.0.0/16","127.0.0.0/8","224.0.0.0/4","::1/128","ff00::/8"]
+
+[wireguard]
+wgCommandPath = "/usr/bin/wg"
+privateKeyPath = "/etc/wireguard/privatekey"
+publicKeyPath = "/etc/wireguard/publickey"
+persistentKeepaliveInterval = 25
+allowedIps = "172.16.0.0/12,10.0.0.0/8,fd00::/8,fe80::/10"
+dnsUpdateInterval = 60
+localEndpointHost = ""
+dn42BandwidthCommunity = 24
+dn42InterfaceSecurityCommunity = 34
+
+[gre]
+localEndpointHost4 = ""
+localEndpointHost6 = ""
+localEndpointDesc4 = ""
+localEndpointDesc6 = ""
+dn42BandwidthCommunity = 24
+dn42InterfaceSecurityCommunity = 31
+
+[peerProbe]
+enabled = true
+intervalSeconds = 300
+probePacketCount = 5
+probePacketIntervalMs = 100
+probePacketEncryptionKey = ""
+sessionWorkerCount = 32
+probePacketBanner = ""
+probeSummaryCooldownSeconds = 30
+
+[logger]
+file = "./logs/peerapi-agent.log"
+maxSize = 10
+maxBackups = 10
+maxAge = 30
+compress = true
+consoleLogging = true
+
+[metric]
+autoTeardown = true
+maxMindGeoLiteCountryMmdbPath = ""
+geoIpCountryMode = "blacklist"
+blacklistGeoCountries = []
+whitelistGeoCountries = []
+pingCommandPath = "/usr/bin/ping"
+pingTimeout = 5
+pingCount = 2
+pingCountOnFail = 1
+pingWorkerCount = 64
+sessionWorkerCount = 64
+maxRTTMetricsHistroy = 288
+geoCheckInterval = 900
+filterParamsUpdateInterval = 3600
