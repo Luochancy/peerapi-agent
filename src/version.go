@@ -19,8 +19,8 @@ import (
 )
 
 const (
-	SERVER_NAME    = "iEdon-PeerAPI-Agent"
-	SERVER_VERSION = "1.9.3"
+	SERVER_NAME    = "PeerHub-Agent"
+	SERVER_VERSION = "1.0.0"
 )
 
 var GIT_COMMIT string // Set at build time via -ldflags "-X main.GIT_COMMIT=$(git rev-parse --short HEAD)"
