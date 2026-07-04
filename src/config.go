@@ -61,6 +61,7 @@ type birdConfig struct {
 	ConnectionMaxRetries       int                `toml:"connectionMaxRetries"`
 	ConnectionRetryDelayMs     int                `toml:"connectionRetryDelayMs"`
 	BGPPeerConfDir             string             `toml:"bgpPeerConfDir"`
+	BGPPeerConfTemplateFile     string             `toml:"bgpPeerConfTemplateFile"`
 	BGPPeerConfTemplateContent string             `toml:"bgpPeerConfTemplate"`
 	BGPPeerConfTemplate        *template.Template `toml:"-"`
 	IPCommandPath              string             `toml:"ipCommandPath"`
